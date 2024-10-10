@@ -1,0 +1,1928 @@
+---
+title: "Plots and spatial autocorrelation analysis"
+author: "Justina Razanauskaite"
+date: "2024-06-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load the packages:
+
+```{r}
+pacman::p_load(tidyverse, raster, sf, ggplot2, dplyr, gridExtra, tmap, cowplot, cartogram, spdep, knitr, kableExtra, webshot2, magick)
+```
+
+Load in the pre-processed (statistical) data:
+
+```{r}
+df <- read_csv("../data/df_final.csv")
+df <- df[,-1]
+```
+
+## Load municipalities:
+
+Loading the data from GADM - Global Administrative Areas database.
+
+```{r}
+# Load the data:
+mun <- st_read("../data/gadm41_DNK_2.json")
+
+# Set the CRS:
+mun <- mun %>% 
+  st_as_sf() %>% 
+  st_transform(crs = 25832) 
+
+# Simple municipality plot:
+#plot(st_geometry(mun))
+
+# Renaming the municipalities so that they would match the ones in the statistical data:
+mun$NAME_2[31] <- "Aarhus"
+mun$NAME_2[25] <- "Copenhagen"
+mun$NAME_2[60] <- "Vesthimmerlands"
+mun$NAME_2[21] <- "Høje-Taastrup"
+```
+
+## Aggregating data by municipality, with total number of top 5 municipalities:
+
+The following code shows top five municipalities according to total number of newcomers to Denmark for years 2020-2023.
+
+In all these plots, top-5 municipalities remain the same:
+- Copenhagen
+- Aarhus
+- Aalborg
+- Odense
+- Frederiksberg
+
+```{r}
+#------------------2020------------------
+aggregated_data_2020 <- df %>%
+  filter(year == 2020) %>%                 # Filter by year
+  group_by(municipality) %>%               # Group data by municipalities
+  summarise(total = sum(n)) %>%            # Calculate the total number of newcomers for each municipality
+  arrange(desc(total))                     # Arrange the data into descending order
+aggregated_data_2020$year <- 2020          # Save an index for a year
+
+# Selecting top 5:
+aggregated_data_2020_t <- aggregated_data_2020[1:5, ]
+
+#------------------2021------------------
+aggregated_data_2021 <- df %>%
+  filter(year == 2021) %>%
+  group_by(municipality) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total))
+aggregated_data_2021$year <- 2021
+
+aggregated_data_2021_t <- aggregated_data_2021[1:5, ]
+
+#------------------2022------------------
+aggregated_data_2022 <- df %>%
+  filter(year == 2022) %>%
+  group_by(municipality) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total))
+aggregated_data_2022$year <- 2022
+
+aggregated_data_2022_t <- aggregated_data_2022[1:5, ]
+
+#------------------2023------------------
+aggregated_data_2023 <- df %>%
+  filter(year == 2023) %>%
+  group_by(municipality) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total))
+aggregated_data_2023$year <- 2023
+
+aggregated_data_2023_t <- aggregated_data_2023[1:5, ]
+
+# The code below combines all data sets with total number of newcomers across Top-5 municipalities, 2020-2023:
+top_5_aggregated <- rbind(aggregated_data_2020_t, 
+                          aggregated_data_2021_t, 
+                          aggregated_data_2022_t, 
+                          aggregated_data_2023_t)
+
+top_5_aggregated$year <- as.factor(top_5_aggregated$year)
+```
+
+## Plot these results as a histogram for each year:
+
+```{r}
+#------------------2020 Top-5 municipalities ------------------
+
+plot_1 <- aggregated_data_2020_t %>%
+  ggplot(aes(x = reorder(municipality, -total), 
+             y = total)) +
+  geom_bar(stat = "identity", 
+           fill = "#8B4513") + 
+  geom_text(aes(label = total), 
+            vjust = -0.3, 
+            size = 2.5) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 14000, by = 1000)) +
+  labs(x = "Municipality", 
+       y = "Total Number of Newcomers", 
+       title = "Top 5 Municipalities by Newcomers, 2020") +
+  theme(plot.title = element_text(hjust = 0.5, 
+                                  face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank())
+
+#------------------2021 Top-5 municipalities ------------------
+
+plot_2 <- aggregated_data_2021_t %>%
+  ggplot(aes(x = reorder(municipality, -total), 
+             y = total)) +
+  geom_bar(stat = "identity", 
+           fill = "#CD853F") + 
+  geom_text(aes(label = total), 
+            vjust = -0.3, 
+            size = 2.5) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 14000, by = 1000)) +
+  labs(x = "Municipality", 
+       y = "Total Number of Newcomers", 
+       title = "Top 5 Municipalities by Newcomers, 2021") +
+  theme(plot.title = element_text(hjust = 0.5, 
+                                  face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank())
+
+#------------------2022 Top-5 municipalities ------------------
+
+plot_3 <- aggregated_data_2022_t %>%
+  ggplot(aes(x = reorder(municipality, -total), 
+             y = total)) +
+  geom_bar(stat = "identity", 
+           fill = "#D2B48C") + 
+  geom_text(aes(label = total), 
+            vjust = -0.3, 
+            size = 2.5) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 14000, by = 1000)) +
+  labs(x = "Municipality", 
+       y = "Total Number of Newcomers", 
+       title = "Top 5 Municipalities by Newcomers, 2022") +
+  theme(plot.title = element_text(hjust = 0.5, 
+                                  face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank())
+
+#------------------2023 Top-5 municipalities ------------------
+
+plot_4 <- aggregated_data_2023_t %>%
+  ggplot(aes(x = reorder(municipality, -total), 
+             y = total)) +
+  geom_bar(stat = "identity", 
+           fill = "#556B2F") + 
+  geom_text(aes(label = total), 
+            vjust = -0.3, 
+            size = 2.5) +
+  theme_minimal() +
+  scale_y_continuous(breaks = seq(0, 14000, by = 1000)) +
+  labs(x = "Municipality", 
+       y = "Total Number of Newcomers", 
+       title = "Top 5 Municipalities by Newcomers, 2023") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank())
+
+# Saving the plots:
+#ggsave("../plots/top5_2020.jpg", plot = plot_1)
+#ggsave("../plots/top5_2021.jpg", plot = plot_2)
+#ggsave("../plots/top5_2022.jpg", plot = plot_3)
+#ggsave("../plots/top5_2023.jpg", plot = plot_4)
+```
+
+## Joining statistical data with spatial data:
+
+```{r}
+data_2020 <- mun %>% dplyr::inner_join(aggregated_data_2020, by = c("NAME_2"="municipality"))
+data_2021 <- mun %>% dplyr::inner_join(aggregated_data_2021, by = c("NAME_2"="municipality"))
+data_2022 <- mun %>% dplyr::inner_join(aggregated_data_2022, by = c("NAME_2"="municipality"))
+data_2023 <- mun %>% dplyr::inner_join(aggregated_data_2023, by = c("NAME_2"="municipality"))
+```
+
+
+## MAP for 2020:
+
+1. Adding extra columns to the data for labels:
+
+```{r}
+data_2020$NAME_3 <- ifelse(data_2020$total == 2067, as.character(data_2020$NAME_2), NA) # Odense
+data_2020$NAME_4 <- ifelse(data_2020$total == 3856, as.character(data_2020$NAME_2), NA) # Aarhus
+data_2020$NAME_5 <- ifelse(data_2020$total == 12891, as.character(data_2020$NAME_2), NA) # Copenhagen
+data_2020$NAME_6 <- ifelse(data_2020$total == 2066, as.character(data_2020$NAME_2), NA) # Frederiksberg
+data_2020$NAME_7 <- ifelse(data_2020$total == 1880, as.character(data_2020$NAME_2), NA) # Aalborg
+```
+
+2. Creating small map-snippet for the main plot:
+
+```{r}
+cph_fred_2020 <- data_2020 %>% 
+  filter(NAME_2 == "Copenhagen" | NAME_2 == "Frederiksberg")
+
+tmap_mode("plot")
+
+tm_2020_snippet <- tm_shape(cph_fred_2020) +
+  tm_borders() +
+  tm_layout(frame = TRUE, frame.lwd = 1.5,
+            legend.show = FALSE,
+            asp = 1.2) + 
+  tm_fill(col = "total",
+          style = "fixed", breaks = c(10, 120, 200, 300, 500, 1000, 4000, 12891)) +
+  tm_shape(cph_fred_2020) +
+  tm_text("NAME_5", size = 0.5, col = "black", fontface = "bold", xmod = -1.5, ymod = -2.5) +
+  tm_shape(cph_fred_2020) +
+  tm_text("NAME_6", size = 0.5, col = "black", fontface = "bold")
+  
+#tm_2020_snippet
+```
+
+3. Creating Copenhagen's bounding box (this one will be used for further maps as well):
+
+```{r}
+cph <- data_2020 %>%
+  subset(NAME_2 == "Copenhagen")
+
+bbox <- st_make_grid(cph$geometry, n = 1)
+```
+
+4. Plotting everything in one for 2020:
+
+```{r}
+tmap_mode("plot")
+
+tm_2020 <- tm_shape(data_2020) +
+  tm_fill(col = "total", title = "Total number \nof Newcomers", 
+          style = "fixed", breaks = c(10, 120, 200, 300, 500, 1000, 4000, 12891))+
+  tm_borders() +
+  tm_layout(main.title = "Total number of Newcomers across municipalities, 2020", 
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold",
+            asp = 1.5, frame = FALSE) +
+  tm_compass(north = 0, size = 1.5, position = c("LEFT", "bottom")) +
+  tm_scale_bar(position = c("LEFT", "bottom")) + 
+  tm_credits(text = "Data source: Statistics Denmark, www.dst.dk", position = c("RIGHT", "bottom"), size = 0.5) +
+  #tm_legend(position=c("left", "top")) +
+  tm_shape(data_2020 %>% top_n(5, total)) +
+  tm_borders(col = "black", lwd = 1.2) + 
+  tm_text("NAME_3", size = 0.7, col = "black", xmod = 1.6, ymod = 0.5, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.4) + # Odense label
+  tm_shape(data_2020) +
+  tm_text("NAME_4", size = 0.7, col = "black", xmod = 1.5, ymod = -0.6, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Aarhus label
+  tm_shape(data_2020) +
+  tm_text("NAME_5", size = 0.7, col = "black", xmod = 1, ymod = -0.7, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Copenhagen label
+  tm_shape(data_2020) +
+  tm_text("NAME_6", size = 0.7, col = "black", xmod = 2.3, ymod = 0.4, fontface = "bold") + # Frederiksberg label
+  tm_shape(data_2020) +
+  tm_text("NAME_7", size = 0.7, col = "black", xmod = 2.4, ymod = 0, fontface = "bold") +  # Aalborg label
+  tm_shape(bbox) + tm_borders(col = "black") # Bounding box object
+#tm_2020
+```
+
+5. Plotting the main map and saving it:
+
+```{r}
+main_map_2020 <- tmap_grob(tm_2020) 
+snippet_map_2020 <- tmap_grob(tm_2020_snippet) 
+
+map_2020 <- ggdraw() +
+  draw_plot(main_map_2020) +
+  draw_plot(snippet_map_2020,
+    height = 0.3,
+    x = 0.34,
+    y = 0.26,
+    scale = 0.8
+  )
+
+#map_2020
+ggsave("../plots/Denmark_Newcomers_2020.png", map_2020, width = 7, height = 5, dpi = 400, units = "in")
+```
+
+## MAP for 2021:
+
+1. Adding extra columns to the data for labels:
+
+```{r}
+data_2021$NAME_3 <- ifelse(data_2021$total == 2378, as.character(data_2021$NAME_2), NA) # Odense
+data_2021$NAME_4 <- ifelse(data_2021$total == 4118, as.character(data_2021$NAME_2), NA) # Aarhus
+data_2021$NAME_5 <- ifelse(data_2021$total == 14267, as.character(data_2021$NAME_2), NA) # Copenhagen
+data_2021$NAME_6 <- ifelse(data_2021$total == 2071, as.character(data_2021$NAME_2), NA) # Frederiksberg
+data_2021$NAME_7 <- ifelse(data_2021$total == 1948, as.character(data_2021$NAME_2), NA) # Aalborg
+```
+
+2. Creating small map-snippet for the main plot:
+
+```{r}
+cph_fred_2021 <- data_2021 %>% 
+  filter(NAME_2 == "Copenhagen" | NAME_2 == "Frederiksberg")
+
+tmap_mode("plot")
+
+tm_2021_snippet <- tm_shape(cph_fred_2021) +
+  tm_borders() +
+  tm_layout(frame = TRUE, frame.lwd = 1.5,
+            legend.show = FALSE,
+            asp = 1.2) + 
+  tm_fill(col = "total",
+          style = "fixed", breaks = c(2, 160, 250, 350, 650, 1900, 4200, 14267)) +
+  tm_shape(cph_fred_2021) +
+  tm_text("NAME_5", size = 0.5, col = "black", fontface = "bold", xmod = -1.5, ymod = -2.5) +
+  tm_shape(cph_fred_2021) +
+  tm_text("NAME_6", size = 0.5, col = "black", fontface = "bold")
+  
+#tm_2021_snippet
+```
+
+3. Plotting everything in one for 2021:
+
+```{r}
+tmap_mode("plot")
+
+tm_2021 <- tm_shape(data_2021) +
+  tm_fill(col = "total", title = "Total number \nof Newcomers", 
+          style = "fixed", breaks = c(2, 160, 250, 350, 650, 1900, 4200, 14267)) +
+  tm_borders() +
+  tm_layout(main.title = "Total number of Newcomers across municipalities, 2021", 
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold",
+            asp = 1.5, frame = FALSE) +
+  tm_compass(north = 0, size = 1.5, position = c("LEFT", "bottom")) +
+  tm_scale_bar(position = c("LEFT", "bottom")) + 
+  tm_credits(text = "Data source: Statistics Denmark, www.dst.dk", position = c("RIGHT", "bottom"), size = 0.5) +
+  #tm_legend(position=c("left", "top")) +
+  tm_shape(data_2021 %>% top_n(5, total)) +
+  tm_borders(col = "black", lwd = 1.2) + 
+  tm_text("NAME_3", size = 0.7, col = "black", xmod = 1.6, ymod = 0.5, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.4) + # Odense label
+  tm_shape(data_2021) +
+  tm_text("NAME_4", size = 0.7, col = "black", xmod = 1.5, ymod = -0.6, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Aarhus label
+  tm_shape(data_2021) +
+  tm_text("NAME_5", size = 0.7, col = "black", xmod = 1, ymod = -0.7, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Copenhagen label
+  tm_shape(data_2021) +
+  tm_text("NAME_6", size = 0.7, col = "black", xmod = 2.3, ymod = 0.4, fontface = "bold") + # Frederiksberg label
+  tm_shape(data_2021) +
+  tm_text("NAME_7", size = 0.7, col = "black", xmod = 2.4, ymod = 0, fontface = "bold") +  # Aalborg label
+  tm_shape(bbox) + tm_borders(col = "black")
+
+#tm_2021
+```
+
+4. Plotting the main map and saving it:
+
+```{r}
+main_map_2021 <- tmap_grob(tm_2021) 
+snippet_map_2021 <- tmap_grob(tm_2021_snippet) 
+
+map_2021 <- ggdraw() +
+  draw_plot(main_map_2021) +
+  draw_plot(snippet_map_2021,
+    height = 0.3,
+    x = 0.34,
+    y = 0.26,
+    scale = 0.8
+  )
+
+#map_2021
+ggsave("../plots/Denmark_Newcomers_2021.png", map_2021, width = 7, height = 5, dpi = 400, units = "in")
+```
+
+## MAP for 2022:
+
+1. Adding extra columns to the data for labels:
+
+```{r}
+data_2022$NAME_3 <- ifelse(data_2022$total == 3776, as.character(data_2022$NAME_2), NA) # Odense
+data_2022$NAME_4 <- ifelse(data_2022$total == 7142, as.character(data_2022$NAME_2), NA) # Aarhus
+data_2022$NAME_5 <- ifelse(data_2022$total == 21940, as.character(data_2022$NAME_2), NA) # Copenhagen
+data_2022$NAME_6 <- ifelse(data_2022$total == 3288, as.character(data_2022$NAME_2), NA) # Frederiksberg
+data_2022$NAME_7 <- ifelse(data_2022$total == 3231, as.character(data_2022$NAME_2), NA) # Aalborg
+```
+
+2. Creating small map-snippet for the main plot:
+
+```{r}
+cph_fred_2022 <- data_2022 %>% 
+  filter(NAME_2 == "Copenhagen" | NAME_2 == "Frederiksberg")
+
+tmap_mode("plot")
+
+tm_2022_snippet <- tm_shape(cph_fred_2022) +
+  tm_borders() +
+  tm_layout(frame = TRUE, frame.lwd = 1.5,
+            legend.show = FALSE,
+            asp = 1.2) + 
+  tm_fill(col = "total",
+          style = "fixed", breaks = c(13, 400, 500, 710, 1500, 3200, 7200, 21940)) +
+  tm_shape(cph_fred_2022) +
+  tm_text("NAME_5", size = 0.5, col = "black", fontface = "bold", xmod = -1.5, ymod = -2.5) +
+  tm_shape(cph_fred_2022) +
+  tm_text("NAME_6", size = 0.5, col = "black", fontface = "bold")
+  
+#tm_2022_snippet
+```
+
+3. Plotting everything in one for 2022:
+
+```{r}
+tmap_mode("plot")
+
+tm_2022 <- tm_shape(data_2022) +
+  tm_fill(col = "total", title = "Total number \nof Newcomers", 
+          style = "fixed", breaks = c(13, 400, 500, 710, 1500, 3200, 7200, 21940)) +
+  tm_borders() +
+  tm_layout(main.title = "Total number of Newcomers across municipalities, 2022", 
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold",
+            asp = 1.5, frame = FALSE) +
+  tm_compass(north = 0, size = 1.5, position = c("LEFT", "bottom")) +
+  tm_scale_bar(position = c("LEFT", "bottom")) + 
+  tm_credits(text = "Data source: Statistics Denmark, www.dst.dk", position = c("RIGHT", "bottom"), size = 0.5) +
+  #tm_legend(position=c("left", "top")) +
+  tm_shape(data_2022 %>% top_n(5, total)) +
+  tm_borders(col = "black", lwd = 1.2) + 
+  tm_text("NAME_3", size = 0.7, col = "black", xmod = 1.6, ymod = 0.5, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.4) + # Odense label
+  tm_shape(data_2022) +
+  tm_text("NAME_4", size = 0.7, col = "black", xmod = 1.5, ymod = -0.6, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Aarhus label
+  tm_shape(data_2022) +
+  tm_text("NAME_5", size = 0.7, col = "black", xmod = 1, ymod = -0.7, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Copenhagen label
+  tm_shape(data_2022) +
+  tm_text("NAME_6", size = 0.7, col = "black", xmod = 2.3, ymod = 0.4, fontface = "bold") + # Frederiksberg label
+  tm_shape(data_2022) +
+  tm_text("NAME_7", size = 0.7, col = "black", xmod = 2.4, ymod = 0, fontface = "bold") +  # Aalborg label
+  tm_shape(bbox) + tm_borders(col = "black")
+#tm_2022
+```
+
+4. Plotting the main map and saving it:
+
+```{r}
+main_map_2022 <- tmap_grob(tm_2022) 
+snippet_map_2022 <- tmap_grob(tm_2022_snippet) 
+
+map_2022 <- ggdraw() +
+  draw_plot(main_map_2022) +
+  draw_plot(snippet_map_2022,
+    height = 0.3,
+    x = 0.34,
+    y = 0.26,
+    scale = 0.8
+  )
+
+#map_2022
+ggsave("../plots/Denmark_Newcomers_2022.png", map_2022, width = 7, height = 5, dpi = 400, units = "in")
+```
+
+
+## MAP for 2023:
+
+1. Adding extra columns to the data for labels:
+
+```{r}
+data_2023$NAME_3 <- ifelse(data_2023$total == 2881, as.character(data_2023$NAME_2), NA) # Odense
+data_2023$NAME_4 <- ifelse(data_2023$total == 6037, as.character(data_2023$NAME_2), NA) # Aarhus
+data_2023$NAME_5 <- ifelse(data_2023$total == 20243, as.character(data_2023$NAME_2), NA) # Copenhagen
+data_2023$NAME_6 <- ifelse(data_2023$total == 2889, as.character(data_2023$NAME_2), NA) # Frederiksberg
+data_2023$NAME_7 <- ifelse(data_2023$total == 2069, as.character(data_2023$NAME_2), NA) # Aalborg
+```
+
+2. Creating small map-snippet for the main plot:
+
+```{r}
+cph_fred_2023 <- data_2023 %>% 
+  filter(NAME_2 == "Copenhagen" | NAME_2 == "Frederiksberg")
+
+tmap_mode("plot")
+
+tm_2023_snippet <- tm_shape(cph_fred_2023) +
+  tm_borders() +
+  tm_layout(frame = TRUE, frame.lwd = 1.5,
+            legend.show = FALSE,
+            asp = 1.2) + 
+  tm_fill(col = "total",
+          style = "fixed", breaks = c(13, 210, 370, 520, 840, 2000, 6100, 20243)) +
+  tm_shape(cph_fred_2023) +
+  tm_text("NAME_5", size = 0.5, col = "black", fontface = "bold", xmod = -1.5, ymod = -2.5) +
+  tm_shape(cph_fred_2023) +
+  tm_text("NAME_6", size = 0.5, col = "black", fontface = "bold")
+  
+#tm_2023_snippet
+```
+
+3. Plotting everything in one for 2023:
+
+```{r}
+tmap_mode("plot")
+
+tm_2023 <- tm_shape(data_2023) +
+  tm_fill(col = "total", title = "Total number \nof Newcomers", 
+          style = "fixed", breaks = c(13, 210, 370, 520, 840, 2000, 6100, 20243)) +
+  tm_borders() +
+  tm_layout(main.title = "Total number of Newcomers across municipalities, 2023", 
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold",
+            asp = 1.5, frame = FALSE) +
+  tm_compass(north = 0, size = 1.5, position = c("LEFT", "bottom")) +
+  tm_scale_bar(position = c("LEFT", "bottom")) + 
+  tm_credits(text = "Data source: Statistics Denmark, www.dst.dk", position = c("RIGHT", "bottom"), size = 0.5) +
+  #tm_legend(position=c("left", "top")) +
+  tm_shape(data_2023 %>% top_n(5, total)) +
+  tm_borders(col = "black", lwd = 1.2) + 
+  tm_text("NAME_3", size = 0.7, col = "black", xmod = 1.6, ymod = 0.5, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.4) + # Odense label
+  tm_shape(data_2023) +
+  tm_text("NAME_4", size = 0.7, col = "black", xmod = 1.5, ymod = -0.6, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Aarhus label
+  tm_shape(data_2023) +
+  tm_text("NAME_5", size = 0.7, col = "black", xmod = 1, ymod = -0.7, 
+          fontface = "bold", bg.color = "white", bg.alpha = 0.3) + # Copenhagen label
+  tm_shape(data_2023) +
+  tm_text("NAME_6", size = 0.7, col = "black", xmod = 2.3, ymod = 0.4, fontface = "bold") + # Frederiksberg label
+  tm_shape(data_2023) +
+  tm_text("NAME_7", size = 0.7, col = "black", xmod = 2.4, ymod = 0, fontface = "bold") +  # Aalborg label
+  tm_shape(bbox) + tm_borders(col = "black")
+#tm_2023
+```
+
+4. Plotting the main map and saving it:
+
+```{r}
+main_map_2023 <- tmap_grob(tm_2023) 
+snippet_map_2023 <- tmap_grob(tm_2023_snippet) 
+
+map_2023 <- ggdraw() +
+  draw_plot(main_map_2023) +
+  draw_plot(snippet_map_2023,
+    height = 0.3,
+    x = 0.34,
+    y = 0.26,
+    scale = 0.8
+  )
+
+#map_2023
+ggsave("../plots/Denmark_Newcomers_2023.png", map_2023, width = 7, height = 5, dpi = 400, units = "in")
+```
+
+## Creating cartograms for 4 datasets:
+
+Create plots:
+
+```{r}
+cart_plot_2020 <- cartogram_cont(data_2020, "total")
+cart_plot_2021 <- cartogram_cont(data_2021, "total")
+cart_plot_2022 <- cartogram_cont(data_2022, "total")
+cart_plot_2023 <- cartogram_cont(data_2023, "total")
+```
+
+Save plots:
+
+```{r}
+png("../plots/cartogram_2020.png", width = 800, height = 600)
+plot(cart_plot_2020$geometry,
+     main = "Cartogram of total number \nof Newcomers across municipalities, 2020")
+dev.off()  # Close the device
+
+png("../plots/cartogram_2021.png", width = 800, height = 600)
+plot(cart_plot_2021$geometry,
+     main = "Cartogram of total number \nof Newcomers across municipalities, 2021")
+dev.off()  # Close the device
+
+png("../plots/cartogram_2022.png", width = 800, height = 600)
+plot(cart_plot_2022$geometry,
+     main = "Cartogram of total number \nof Newcomers across municipalities, 2022")
+dev.off()  # Close the device
+
+png("../plots/cartogram_2023.png", width = 800, height = 600)
+plot(cart_plot_2023$geometry,
+     main = "Cartogram of total number \nof Newcomers across municipalities, 2023")
+dev.off()  # Close the device
+```
+
+
+## Calculating the percentage of people that came from America, Europe, Africa, Oceania and Asia regions.
+
+```{r}
+americas <- c("USA", "Brazil", "Mexico", "Colombia", "Argentina", "Canada", "Peru", "Venezuela",
+              "Chile", "Ecuador", "Guatemala", "Bolivia", "Haiti", "Cuba", "Dominican Republic", "Honduras",
+              "Paraguay", "El Salvador", "Nicaragua", "Costa Rica", "Panama", "Uruguay", "Jamaica", 
+              "Trinidad and Tobago", "Guyana", "Suriname", "Belize", "Bahamas", "Barbados", "Saint Lucia",
+              "Grenada", "Saint Vincent and the Grenadines", "Antigua and Barbuda", "Dominica", 
+              "Dominican Republic", "Saint Kitts and Nevis", "Guyana")
+
+europe <- c("Austria", "Albania", "Belgium", "Belarus", "Bulgaria", "Bosnia and Herzegovina",  
+            "Croatia", "Cyprus", "Czech Republic", 
+            "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", 
+            "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", 
+            "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden", "Iceland", "Kosovo",
+            "Moldova", "Montenegro", "Macedonia", "Norway", "Serbia", "Serbia and Montenegro", "Switzerland",
+            "Ukraine", "United Kingdom", "Andorra", "Liechtenstein", "Andorra")
+
+africa <- c(
+  "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi", "Cabo Verde", "Cameroon", 
+  "Central African Republic", "Chad", "Comoros", "Congo, Democratic Republic of the", 
+  "Congo", "Djibouti", "Egypt", "Equatorial Guinea", "Eritrea", "Eswatini", "Ethiopia", "Gabon", 
+  "Gambia", "Ghana", "Guinea", "Guinea-Bissau", "Ivory Coast", "Kenya",
+  "Lesotho", "Liberia", "Libya", "Madagascar", "Malawi", "Mali", "Mauritania", "Mauritius", 
+  "Morocco", "Mozambique", "Namibia", "Niger", "Nigeria", "Rwanda", "Sao Tome and Principe", 
+  "Senegal", "Seychelles", "Sierra Leone", "Somalia", "South Africa", "South Sudan", "Sudan", 
+  "Tanzania", "Togo", "Tunisia", "Uganda", "Zambia", "Zimbabwe", "Eswantini", "Cape Verde")
+
+asia <- c(
+  "Afghanistan", "Armenia", "Azerbaijan", "Bahrain", "Bangladesh", "Bhutan", "Brunei", "Cambodia", 
+  "China", "Cyprus", "Georgia", "India", "Indonesia", "Iran", "Iraq", "Israel", "Japan", "Jordan", 
+  "Kazakhstan", "Kuwait", "Kyrgyzstan", "Laos", "Lebanon", "Malaysia", "Maldives", "Mongolia", 
+  "Myanmar (Burma)", "Nepal", "North Korea", "Oman", "Pakistan", "Palestine", "Philippines", 
+  "Qatar", "Saudi Arabia", "Singapore", "South Korea", "Sri Lanka", "Syria", "Taiwan", "Tajikistan", 
+  "Thailand", "Timor-Leste (East Timor)", "Turkey", "Turkmenistan", "United Arab Emirates", "Uzbekistan", 
+  "Vietnam", "Yemen", "Myanmar", "Russia", "Brunei", "Myanmar (Burma)", "Myanmar", "Burma", "Oman", "Palestine",
+  "Timor-Leste", "United Arab Emirates")
+
+oceania <- c("Australia", "Fiji", "New Zealand", "Samoa", "Tonga", "Nauru","Vanuatu")
+```
+
+
+Calculating the percentage of people coming from each region to Denmark:
+
+```{r}
+df_20 <- df %>%
+  filter(year == 2020)
+
+df_21 <- df %>%
+  filter(year == 2021)
+
+df_22 <- df %>%
+  filter(year == 2022)
+
+df_23 <- df %>%
+  filter(year == 2023)
+
+# ----------2020----------
+
+continent <- c()
+
+for (org in df_20$origin) {
+  if (org %in% americas) {
+    continent <- c(continent, "America")
+  } else if (org %in% europe) {
+    continent <- c(continent, "Europe")
+  } else if (org %in% africa) {
+    continent <- c(continent, "Africa")
+  } else if (org %in% asia) {
+    continent <- c(continent, "Asia")
+  } else if (org %in% oceania) {
+    continent <- c(continent, "Oceania")
+  }
+}
+
+df_20$continent <- continent
+
+# ----------2021----------
+
+continent_1 <- c()
+
+for (org in df_21$origin) {
+  if (org %in% americas) {
+    continent_1 <- c(continent_1, "America")
+  } else if (org %in% europe) {
+    continent_1 <- c(continent_1, "Europe")
+  } else if (org %in% africa) {
+    continent_1 <- c(continent_1, "Africa")
+  } else if (org %in% asia) {
+    continent_1 <- c(continent_1, "Asia")
+  } else if (org %in% oceania) {
+    continent_1 <- c(continent_1, "Oceania")
+  }
+}
+df_21$continent <- continent_1
+
+# ----------2022----------
+
+continent_2 <- c()
+
+for (org in df_22$origin) {
+  if (org %in% americas) {
+    continent_2 <- c(continent_2, "America")
+  } else if (org %in% europe) {
+    continent_2 <- c(continent_2, "Europe")
+  } else if (org %in% africa) {
+    continent_2 <- c(continent_2, "Africa")
+  } else if (org %in% asia) {
+    continent_2 <- c(continent_2, "Asia")
+  } else if (org %in% oceania) {
+    continent_2 <- c(continent_2, "Oceania")
+  }
+}
+df_22$continent <- continent_2
+
+# ----------2023----------
+
+continent_3 <- c()
+
+for (org in df_23$origin) {
+  if (org %in% americas) {
+    continent_3 <- c(continent_3, "America")
+  } else if (org %in% europe) {
+    continent_3 <- c(continent_3, "Europe")
+  } else if (org %in% africa) {
+    continent_3 <- c(continent_3, "Africa")
+  } else if (org %in% asia) {
+    continent_3 <- c(continent_3, "Asia")
+  } else if (org %in% oceania) {
+    continent_3 <- c(continent_3, "Oceania")
+  }
+}
+
+df_23$continent <- continent_3
+```
+
+
+### The code below calculates the percentage of newcomers in Denmark by the "region" of origin.
+
+```{r}
+# ----------Calculating the sum of newcomers per each year----------
+
+n_foreigners_2020 <- sum(df_20$n)
+n_foreigners_2021 <- sum(df_21$n) 
+n_foreigners_2022 <- sum(df_22$n) 
+n_foreigners_2023 <- sum(df_23$n) 
+
+
+# ----------2020----------
+
+continent_data_2020 <- df_20 %>%
+  group_by(continent) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total))
+
+pct_2020 <- c()
+
+for (num in continent_data_2020$total) {
+  percentage <- round(num*100/n_foreigners_2020, 1)
+  pct_2020 <- c(pct_2020, percentage)
+}
+
+continent_data_2020$pct <- pct_2020
+continent_data_2020$year <- 2020
+
+
+# ----------2021----------
+
+continent_data_2021 <- df_21 %>%
+  group_by(continent) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total))
+
+pct_2021 <- c()
+
+for (num in continent_data_2021$total) {
+  percentage <- round(num*100/n_foreigners_2021, 1)
+  pct_2021 <- c(pct_2021, percentage)
+}
+
+continent_data_2021$pct <- pct_2021
+continent_data_2021$year <- 2021
+
+# ----------2022----------
+
+continent_data_2022 <- df_22 %>%
+  group_by(continent) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total))
+
+pct_2022 <- c()
+
+for (num in continent_data_2022$total) {
+  percentage <- round(num*100/n_foreigners_2022, 1)
+  pct_2022 <- c(pct_2022, percentage)
+}
+
+continent_data_2022$pct <- pct_2022
+continent_data_2022$year <- 2022
+
+# ----------2023----------
+
+continent_data_2023 <- df_23 %>%
+  group_by(continent) %>%
+  summarise(total = sum(n)) %>%
+  arrange(desc(total))
+
+pct_2023 <- c()
+
+for (num in continent_data_2023$total) {
+  percentage <- round(num*100/n_foreigners_2023, 1)
+  pct_2023 <- c(pct_2023, percentage)
+}
+
+continent_data_2023$pct <- pct_2023
+continent_data_2023$year <- 2023
+
+# ----------Combine all data together, save it as an image for Appendix----------
+
+grand_continent_data <- rbind(continent_data_2020, continent_data_2021, continent_data_2022, continent_data_2023)
+
+# Change the column names:
+colnames(grand_continent_data) <- c("Region", "Total", "Percentage", "Year")
+
+data_table_1 <- kable(grand_continent_data, format = "html", table.attr = "style='width:100%;'") %>%
+  kable_styling(full_width = F, position = "center", bootstrap_options = c("striped", "hover", "condensed")) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "black") %>%
+  column_spec(1, bold = TRUE, border_right = TRUE)
+
+save_kable(data_table_1, "../plots/data_table_1.png")
+
+# Visualising
+
+palette <- c("#8B4513","#556B2F", "#A0522D", "#CD853F", "#D2B48C")
+
+plot_cont_d <- grand_continent_data %>%
+  ggplot(aes(x = Region, y = Percentage, fill = Region)) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = Percentage), vjust = -0.3, size = 2.5) +
+  theme_minimal() +
+  facet_wrap(~Year, scales = "free_x") +
+  scale_fill_manual(values = palette) +  # Corrected scale_fill_manual
+  scale_y_continuous(breaks = seq(0, 14000, by = 1000)) +
+  labs(x = "Region", y = "Percentage of Newcomers", title = "Percentage of Newcomers across regions, 2020-2023") +
+  theme(
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        legend.position = "none")
+
+#ggsave("../plots/per_continent.jpg", plot = plot_cont_d)
+
+# The code below is used to calculate the average percentages - this is used in the paper:
+europe_d <- filter(grand_continent_data, Region == "Europe")
+mean(europe_d$Percentage)
+
+asia_d <- filter(grand_continent_data, Region == "Asia")
+mean(asia_d$Percentage)
+
+africa_d <- filter(grand_continent_data, Region == "Africa")
+mean(africa_d$Percentage)
+
+oceania_d <- filter(grand_continent_data, Region == "Oceania")
+mean(oceania_d$Percentage)
+
+america_d <- filter(grand_continent_data, Region == "America")
+mean(america_d$Percentage)
+```
+
+### Finding the origins to run the analysis for (according to the number of newcomers):
+
+```{r}
+df_with_continents <- df
+
+origin_by_municipality <- df_with_continents %>%
+  group_by(origin) %>%
+  summarise(origin_total = sum(n))
+
+continent_4 <- c()
+
+for (org in origin_by_municipality$origin) {
+  if (org %in% americas) {
+    continent_4 <- c(continent_4, "America")
+  } else if (org %in% europe) {
+    continent_4 <- c(continent_4, "Europe")
+  } else if (org %in% africa) {
+    continent_4 <- c(continent_4, "Africa")
+  } else if (org %in% asia) {
+    continent_4 <- c(continent_4, "Asia")
+  } else if (org %in% oceania) {
+    continent_4 <- c(continent_4, "Oceania")
+  }
+}
+
+origin_by_municipality$continent <- continent_4
+
+# ----------See from where migration happens the most - data to use for the analysis----------
+
+# Since over 70%, generally, migrants come from Europe, I will look into 4 countries from Europe. For other regions, I am analysing only the top 1 (except Asia - top 2).
+
+top_4_europe <- origin_by_municipality %>%
+  filter(continent == "Europe") %>%
+  arrange(desc(origin_total)) %>%
+  head(4)
+
+top_1_america <- origin_by_municipality %>%
+  filter(continent == "America") %>%
+  arrange(desc(origin_total)) %>%
+  head(1)
+
+top_2_asia <- origin_by_municipality %>%
+  filter(continent == "Asia") %>%
+  arrange(desc(origin_total)) %>%
+  head(2)
+
+top_1_africa <- origin_by_municipality %>%
+  filter(continent == "Africa") %>%
+  arrange(desc(origin_total)) %>%
+  head(1)
+
+top_1_oceania <- origin_by_municipality %>%
+  filter(continent == "Oceania") %>%
+  arrange(desc(origin_total)) %>%
+  head(1)
+
+top_per_continent <- rbind(top_4_europe, top_2_asia, top_1_america,
+                                  top_1_africa, top_1_oceania)
+```
+
+
+## Create data frame for analysis:
+
+```{r}
+spatial_data <- mun %>% dplyr::inner_join(df, by = c("NAME_2"="municipality"))
+```
+
+## Performing Morans I test with Monte Carlo simulations
+
+### People coming from Ukraine:
+
+```{r}
+ukraine <- df %>%
+  filter(origin == "Ukraine") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+ukraine <- mun %>% dplyr::inner_join(ukraine, by = c("NAME_2"="municipality"))
+
+ukraine_map <- tm_shape(ukraine) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from Ukraine, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+#tmap_save(ukraine_map, "../plots/Ukraine.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+ukraine_queen_nb <- poly2nb(ukraine$geometry, queen = TRUE)
+ukraine_centers <- st_coordinates(st_centroid(ukraine$geometry))
+
+# Saving the plot:
+png("../plots/ukraine_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(ukraine_queen_nb, ukraine_centers, col = "red",add = TRUE)
+title("Queen Contiguity, Ukraine")
+dev.off()
+
+# Test:
+moran.mc(ukraine$origin_total, 
+         nb2listw(ukraine_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+ukraine_centers_2 <- st_centroid(ukraine$geometry, of_largest_polygon = TRUE)
+ukraine_nb_25km <- dnearneigh(ukraine_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/ukraine_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(ukraine_nb_25km, ukraine_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, Ukraine")
+dev.off()
+
+# Test:
+moran.mc(ukraine$origin_total, 
+         nb2listw(ukraine_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+ukraine_nb_50km <- dnearneigh(ukraine_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/ukraine_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(ukraine_nb_50km, ukraine_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, Ukraine")
+dev.off()
+
+# Test:
+moran.mc(ukraine$origin_total, 
+         nb2listw(ukraine_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+ukraine_nb_k3 <- knearneigh(ukraine_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(ukraine, "Spatial"))
+ukraine_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/ukraine_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(ukraine_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), Ukraine")
+dev.off()
+
+# Test:
+moran.mc(ukraine$origin_total,
+         nb2listw(knn2nb(ukraine_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from Romania:
+
+```{r}
+romania <- df %>%
+  filter(origin == "Romania") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+romania <- mun %>% dplyr::inner_join(romania, by = c("NAME_2"="municipality"))
+
+romania_map <- tm_shape(romania) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from Romania, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+tmap_save(romania_map, "../plots/Romania.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+romania_queen_nb <- poly2nb(romania$geometry, queen = TRUE)
+romania_centers <- st_coordinates(st_centroid(romania$geometry))
+
+# Saving the plot:
+png("../plots/romania_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(romania_queen_nb, romania_centers, col = "red",add = TRUE)
+title("Queen Contiguity, Romania")
+dev.off()
+
+
+# Test:
+moran.mc(romania$origin_total, 
+         nb2listw(romania_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+romania_centers_2 <- st_centroid(romania$geometry, of_largest_polygon = TRUE)
+romania_nb_25km <- dnearneigh(romania_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/romania_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(romania_nb_25km, romania_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, Romania")
+dev.off()
+
+
+# Test:
+moran.mc(romania$origin_total, 
+         nb2listw(romania_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+romania_nb_50km <- dnearneigh(romania_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/romania_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(romania_nb_50km, romania_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, Romania")
+dev.off()
+
+
+# Test:
+moran.mc(romania$origin_total, 
+         nb2listw(romania_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+romania_nb_k3 <- knearneigh(romania_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(romania, "Spatial"))
+romania_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/romania_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(romania_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), Romania")
+dev.off()
+
+# Test:
+moran.mc(romania$origin_total,
+         nb2listw(knn2nb(romania_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from Germany:
+
+```{r}
+germany <- df %>%
+  filter(origin == "Germany") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+germany <- mun %>% dplyr::inner_join(germany, by = c("NAME_2"="municipality"))
+
+germany_map <- tm_shape(germany) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from Germany, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+#tmap_save(germany_map, "../plots/Germany.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+germany_queen_nb <- poly2nb(germany$geometry, queen = TRUE)
+germany_centers <- st_coordinates(st_centroid(germany$geometry))
+
+# Saving the plot:
+png("../plots/germany_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(germany_queen_nb, germany_centers, col = "red",add = TRUE)
+title("Queen Contiguity, Germany")
+dev.off()
+
+# Test:
+moran.mc(germany$origin_total, 
+         nb2listw(germany_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+germany_centers_2 <- st_centroid(germany$geometry, of_largest_polygon = TRUE)
+germany_nb_25km <- dnearneigh(germany_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/germany_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(germany_nb_25km, germany_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, Germany")
+dev.off()
+
+
+# Test:
+moran.mc(germany$origin_total, 
+         nb2listw(germany_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+germany_nb_50km <- dnearneigh(germany_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/germany_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(germany_nb_50km, germany_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, Germany")
+dev.off()
+
+# Test:
+moran.mc(germany$origin_total, 
+         nb2listw(germany_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+germany_nb_k3 <- knearneigh(germany_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(germany, "Spatial"))
+germany_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/germany_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(germany_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), Germany")
+dev.off()
+
+
+# Test:
+moran.mc(germany$origin_total,
+         nb2listw(knn2nb(germany_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from India:
+
+```{r}
+india <- df %>%
+  filter(origin == "India") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+india <- mun %>% dplyr::inner_join(india, by = c("NAME_2"="municipality"))
+
+india_map <- tm_shape(india) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from India, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+#tmap_save(india_map, "../plots/India.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+india_queen_nb <- poly2nb(india$geometry, queen = TRUE)
+india_centers <- st_coordinates(st_centroid(india$geometry))
+
+# Saving the plot:
+png("../plots/india_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(india_queen_nb, india_centers, col = "red",add = TRUE)
+title("Queen Contiguity, India")
+dev.off()
+
+
+# Test:
+moran.mc(india$origin_total, 
+         nb2listw(india_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+india_centers_2 <- st_centroid(india$geometry, of_largest_polygon = TRUE)
+india_nb_25km <- dnearneigh(india_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/india_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(india_nb_25km, india_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, India")
+dev.off()
+
+
+# Test:
+moran.mc(india$origin_total, 
+         nb2listw(india_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+india_nb_50km <- dnearneigh(india_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/india_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(india_nb_50km, india_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, India")
+dev.off()
+
+
+# Test:
+moran.mc(india$origin_total, 
+         nb2listw(india_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+india_nb_k3 <- knearneigh(india_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(india, "Spatial"))
+india_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/india_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(india_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), India")
+dev.off()
+
+
+# Test:
+moran.mc(india$origin_total,
+         nb2listw(knn2nb(india_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from China:
+
+```{r}
+china <- df %>%
+  filter(origin == "China") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+china <- mun %>% dplyr::inner_join(china, by = c("NAME_2"="municipality"))
+
+china_map <- tm_shape(ukraine) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from China, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+#tmap_save(china_map, "../plots/China.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+china_queen_nb <- poly2nb(china$geometry, queen = TRUE)
+china_centers <- st_coordinates(st_centroid(china$geometry))
+
+# Saving the plot:
+png("../plots/china_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(china_queen_nb, china_centers, col = "red",add = TRUE)
+title("Queen Contiguity, China")
+dev.off()
+
+# Test:
+moran.mc(china$origin_total, 
+         nb2listw(china_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+china_centers_2 <- st_centroid(china$geometry, of_largest_polygon = TRUE)
+china_nb_25km <- dnearneigh(china_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/china_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(china_nb_25km, china_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, China")
+dev.off()
+
+# Test:
+moran.mc(china$origin_total, 
+         nb2listw(china_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+china_nb_50km <- dnearneigh(china_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/china_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(china_nb_50km, china_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, China")
+dev.off()
+
+# Test:
+moran.mc(china$origin_total, 
+         nb2listw(china_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+china_nb_k3 <- knearneigh(china_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(china, "Spatial"))
+china_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/china_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(china_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), China")
+dev.off()
+
+
+# Test:
+moran.mc(china$origin_total,
+         nb2listw(knn2nb(china_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from USA:
+
+```{r}
+usa <- df %>%
+  filter(origin == "USA") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+usa <- mun %>% dplyr::inner_join(usa, by = c("NAME_2"="municipality"))
+
+usa_map <- tm_shape(ukraine) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from USA, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+#tmap_save(usa_map, "../plots/USA.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+usa_queen_nb <- poly2nb(usa$geometry, queen = TRUE)
+usa_centers <- st_coordinates(st_centroid(usa$geometry))
+
+# Saving the plot:
+png("../plots/usa_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(usa_queen_nb,usa_centers, col = "red",add = TRUE)
+title("Queen Contiguity, USA")
+dev.off()
+
+
+# Test:
+moran.mc(usa$origin_total, 
+         nb2listw(usa_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+usa_centers_2 <- st_centroid(usa$geometry, of_largest_polygon = TRUE)
+usa_nb_25km <- dnearneigh(usa_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/usa_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(usa_nb_25km, usa_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, USA")
+dev.off()
+
+# Test:
+moran.mc(usa$origin_total, 
+         nb2listw(usa_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+usa_nb_50km <- dnearneigh(usa_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/usa_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(usa_nb_50km, usa_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, USA")
+dev.off()
+
+
+# Test:
+moran.mc(usa$origin_total, 
+         nb2listw(usa_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+usa_nb_k3 <- knearneigh(usa_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(usa, "Spatial"))
+usa_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/usa_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(usa_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), USA")
+dev.off()
+
+
+# Test:
+moran.mc(usa$origin_total,
+         nb2listw(knn2nb(usa_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from Eritrea:
+
+```{r}
+eritrea <- df %>%
+  filter(origin == "Eritrea") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+eritrea <- mun %>% dplyr::inner_join(eritrea, by = c("NAME_2"="municipality"))
+
+eritrea_map <- tm_shape(eritrea) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from Eritrea, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+#tmap_save(eritrea_map, "../plots/Eritrea.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+eritrea_queen_nb <- poly2nb(eritrea$geometry, queen = TRUE)
+eritrea_centers <- st_coordinates(st_centroid(eritrea$geometry))
+
+# Saving the plot:
+png("../plots/eritrea_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(eritrea_queen_nb, eritrea_centers, col = "red",add = TRUE)
+title("Queen Contiguity, Eritrea")
+dev.off()
+
+
+# Test:
+moran.mc(eritrea$origin_total, 
+         nb2listw(eritrea_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+eritrea_centers_2 <- st_centroid(eritrea$geometry, of_largest_polygon = TRUE)
+eritrea_nb_25km <- dnearneigh(eritrea_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/eritrea_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(eritrea_nb_25km, eritrea_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, Eritrea")
+dev.off()
+
+# Test:
+moran.mc(eritrea$origin_total, 
+         nb2listw(eritrea_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+eritrea_nb_50km <- dnearneigh(eritrea_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/eritrea_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(eritrea_nb_50km, eritrea_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, Eritrea")
+dev.off()
+
+
+# Test:
+moran.mc(eritrea$origin_total, 
+         nb2listw(eritrea_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+eritrea_nb_k3 <- knearneigh(eritrea_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(eritrea, "Spatial"))
+eritrea_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/eritrea_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(eritrea_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), Eritrea")
+dev.off()
+
+# Test:
+moran.mc(eritrea$origin_total,
+         nb2listw(knn2nb(eritrea_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from Australia:
+
+```{r}
+australia <- df %>%
+  filter(origin == "Australia") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+australia <- mun %>% dplyr::inner_join(australia, by = c("NAME_2"="municipality"))
+
+australia_map <- tm_shape(australia) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from Australia, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+#tmap_save(australia_map, "../plots/Australia.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+australia_queen_nb <- poly2nb(australia$geometry, queen = TRUE)
+australia_centers <- st_coordinates(st_centroid(australia$geometry))
+
+# Saving the plot:
+png("../plots/australia_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(australia_queen_nb, australia_centers, col = "red",add = TRUE)
+title("Queen Contiguity, Australia")
+dev.off()
+
+# Test:
+moran.mc(australia$origin_total, 
+         nb2listw(australia_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+australia_centers_2 <- st_centroid(australia$geometry, of_largest_polygon = TRUE)
+australia_nb_25km <- dnearneigh(australia_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/australia_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(australia_nb_25km, australia_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, Australia")
+dev.off()
+
+
+# Test:
+moran.mc(australia$origin_total, 
+         nb2listw(australia_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+australia_nb_50km <- dnearneigh(australia_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/australia_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(australia_nb_50km, australia_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, Australia")
+dev.off()
+
+# Test:
+moran.mc(australia$origin_total, 
+         nb2listw(australia_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+australia_nb_k3 <- knearneigh(australia_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(australia, "Spatial"))
+australia_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/australia_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(australia_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), Australia")
+dev.off()
+
+# Test:
+moran.mc(australia$origin_total,
+         nb2listw(knn2nb(australia_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+### People coming from Poland:
+
+```{r}
+poland <- df %>%
+  filter(origin == "Poland") %>%
+  group_by(municipality) %>%
+  summarise(origin_total = sum(n))
+
+poland <- mun %>% dplyr::inner_join(poland, by = c("NAME_2"="municipality"))
+
+poland_map <- tm_shape(poland) +
+  tm_fill(col = "origin_total", title = "Total:",
+          style = "quantile", n = 8) +
+  tm_borders() +
+  tm_layout(frame = TRUE,
+            legend.show = TRUE,
+            asp = 1.2,
+            main.title = "Total number of Newcomers from Poland, 2020-2023",
+            main.title.size = 1,
+            main.title.position = "center",
+            main.title.fontface = "bold")
+  
+tmap_save(poland_map, "../plots/Poland.png", width = 7, height = 5, dpi = 400, units = "in")
+```
+
+*Queen Contiguity:*
+
+```{r}
+set.seed(1)
+poland_queen_nb <- poly2nb(poland$geometry, queen = TRUE)
+poland_centers <- st_coordinates(st_centroid(poland$geometry))
+
+# Saving the plot:
+png("../plots/poland_queen.png", width = 800, height = 600)
+plot(mun$geometry); plot(poland_queen_nb, poland_centers, col = "red",add = TRUE)
+title("Queen Contiguity, Poland")
+dev.off()
+
+
+# Test:
+moran.mc(poland$origin_total, 
+         nb2listw(poland_queen_nb, style = "W",zero.policy=TRUE), 
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 25km:*
+
+```{r}
+set.seed(1)
+poland_centers_2 <- st_centroid(poland$geometry, of_largest_polygon = TRUE)
+poland_nb_25km <- dnearneigh(poland_centers_2, 0, 25000)
+
+# Saving the plot:
+png("../plots/poland_25km.png", width = 800, height = 600)
+plot(mun$geometry); plot(poland_nb_25km, poland_centers_2, col = "red",add = TRUE)
+title("Distance of 25km, Poland")
+dev.off()
+
+
+# Test:
+moran.mc(poland$origin_total, 
+         nb2listw(poland_nb_25km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Distance of 50km:*
+
+```{r}
+set.seed(1)
+poland_nb_50km <- dnearneigh(poland_centers_2, 0, 50000)
+
+# Saving the plot:
+png("../plots/poland_50km.png", width = 800, height = 600)
+plot(mun$geometry); plot(poland_nb_50km, poland_centers_2, col = "red",add = TRUE)
+title("Distance of 50km, Poland")
+dev.off()
+
+# Test:
+moran.mc(poland$origin_total, 
+         nb2listw(poland_nb_50km, style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, nsim = 999)
+```
+
+*Three nearest neighbors:*
+
+```{r}
+set.seed(1)
+poland_nb_k3 <- knearneigh(poland_centers_2, k = 3)
+
+# Saving the plot:
+coordinates_d <- coordinates(as(poland, "Spatial"))
+poland_k3 <- knearneigh(coordinates_d, k = 3)
+png("../plots/poland_k.png", width = 800, height = 600)
+plot(mun$geometry); plot(knn2nb(poland_k3), coordinates_d, col = "red",add = TRUE)
+title("K-nearest neighbors (k=3), Poland")
+dev.off()
+
+
+# Test:
+moran.mc(poland$origin_total,
+         nb2listw(knn2nb(poland_nb_k3), style = "W", zero.policy=TRUE),
+         zero.policy=TRUE, 
+         nsim = 999)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

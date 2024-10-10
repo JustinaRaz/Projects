@@ -1,0 +1,108 @@
+---
+title: "Preprocessing"
+author: "Justina Razanauskaite"
+date: "2024-05-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load packages:
+
+```{r}
+pacman::p_load(tidyverse, readr)
+```
+
+Read the data in:
+
+```{r}
+df_2020 <- read.csv("../data/to_clean/2020.csv", 
+                      sep = ";", 
+                      header = FALSE, 
+                      col.names = c("municipality", "origin", "n"), 
+                      fileEncoding = "Windows-1252")
+
+df_2021 <- read.csv("../data/to_clean/2021.csv", 
+                      sep = ";", 
+                      header = FALSE, 
+                      col.names = c("municipality", "origin", "n"), 
+                      fileEncoding = "Windows-1252")
+
+df_2022 <- read.csv("../data/to_clean/2022.csv", 
+                      sep = ";", 
+                      header = FALSE, 
+                      col.names = c("municipality", "origin", "n"), 
+                      fileEncoding = "Windows-1252")
+
+df_2023 <- read.csv("../data/to_clean/2023.csv", 
+                      sep = ";", 
+                      header = FALSE, 
+                      col.names = c("municipality", "origin", "n"), 
+                      fileEncoding = "Windows-1252")
+```
+
+The following code removes those rows that contain 0 as a number of newcomers from origin X to municipality Y. It also adds a column which represents the year of when data was collected, as in one of the following steps, all four datasets are combined into one:
+
+```{r}
+df_2020 <- df_2020[df_2020$n != 0, ]
+df_2020$year <- 2020 
+
+df_2021 <- df_2021[df_2021$n != 0, ]
+df_2021$year <- 2021
+
+df_2022 <- df_2022[df_2022$n != 0, ]
+df_2022$year <- 2022 
+
+df_2023 <- df_2023[df_2023$n != 0, ]
+df_2023$year <- 2023 
+```
+
+Combine the data by rows:
+
+```{r}
+df <- rbind(df_2020, df_2021, df_2022, df_2023)
+```
+
+*Cleaning up:*
+1. Removing rows that did not state any country of origin;
+2. Removing rows that have two countries as an origin, just for simplicity;
+3. Some countries were renamed so that the naming wouldn't affect the total numbers.
+
+```{r}
+sort(unique(df$origin))
+
+df <- df[df$origin != "Africa not stated", ]
+df <- df[df$origin != "Denmark", ]
+df <- df[df$origin != "Asia not stated", ]
+df <- df[df$origin != "Europe not stated", ]
+df <- df[df$origin != "Middle East not stated", ]
+df <- df[df$origin != "Not stated", ]
+df <- df[df$origin != "Stateless", ]
+df <- df[df$origin != "Yugoslavia, Federal Republic", ]
+df <- df[df$origin != "Yugoslavia", ]
+df <- df[df$origin != "Czechoslovakia", ]
+df <- df[df$municipality != "Region Sjælland", ]
+df <- df[df$municipality != "Serbia and Montenegro", ]
+
+df[df$origin == "Congo, Democratic Republic", "origin"] <- "Congo"
+df[df$origin == "Congo, Republic" , "origin"] <- "Congo"
+df[df$origin == "Gambia, The", "origin"] <- "Gambia"
+df[df$origin == "Republic of North Macedonia", "origin"] <- "Macedonia"
+df[df$origin == "Soviet Union", "origin"] <- "Russia"
+df[df$origin == "North Macedonia", "origin"] <- "Macedonia"
+df[df$origin == "Timor-Leste (East Timor)", "origin"] <- "Timor-Leste"
+
+```
+
+Save the data:
+
+```{r}
+row.names(df) <- NULL
+write.csv(df, "../data/df_final.csv")
+```
+
+
+
+
