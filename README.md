@@ -1,7 +1,7 @@
 # Projects
 
 ## Overview
-This repository is used for storing project,exam-related files and other resources.
+This repository is used for storing project, exam-related files and other resources.
 
 ## Repository Structure
 - `/Bachelor's thesis`: Contains code and the paper of my Bachelor's thesis.
@@ -15,3 +15,4 @@ If you're adding files to any empty folder, please delete the `.gitkeep` or plac
 ## Notes
 This repository is solely for project storage.
 Some empty folders contain ./gitkeep files. These are created to ensure the right structure for reproducibility of results.
+
