@@ -1,0 +1,1125 @@
+---
+title: "Data analysis - Bachelor's thesis"
+author: "Justina Razanauskaite"
+date: "2023-09-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Load the packages:
+```{r}
+pacman::p_load(tidyverse, data.table, dplyr, tidybayes, ggplot2, ggridges, plyr, brms, cowplot, cmdstanr, purrr, gridExtra, bayesplot, viridis)
+```
+
+Load the data:
+```{r}
+data <- read_csv('final_data.csv')
+data <- data[, -1] #deletes first column that is randomly generated when loading the data.
+data$ID <- as.numeric(data$ID)
+```
+
+
+*Model 1: *
+```{r}
+# FORMULA 
+
+f1 <- bf(RL ~ 0 + relation_type +
+           (0 + relation_type  | ID) + 
+           (1 | conversationID),
+         beta ~ 0 + relation_type #+ (0 + relation_type  | ID) # concerns the tail of the distribution, it also depends on the connection, how long the gaps are between the friends and strangers.
+         ) 
+
+get_prior(f1, data = data, family = exgaussian)
+
+
+#priors_1 <- c(
+  #prior(normal(0, 0.5), class = b), ## prior for the betas            
+  #prior(normal(0, 0.5), class = sd),# ## prior for the random effects
+  #prior(normal(0, 1), class = b, dpar = beta), ## prior for the long tail
+  #prior(normal(0, 0.5), class = sigma) ## prior for the errors in the model
+#)
+
+#_____________________________________________________________
+#PRIORS
+
+priors_1_1 <- c(
+  prior(normal(0, 0.5), class = b), ## prior for the betas            
+  prior(normal(0, 0.5), class = sd),# ## prior for the random effects
+  prior(normal(0, 1.5), class = b, dpar = beta), ## prior for the long tail
+  prior(normal(0, 0.8), class = sigma) ## prior for the errors in the model
+)
+
+#_____________________________________________________________
+#SAMPLE DATA FOR TESTING BAYESIAN MODELS
+
+#d_sample <- data %>% subset(ID %in% sample(unique(data$ID), 5))
+
+#_____________________________________________________________
+#MODEL TO SAMPLE PRIORS
+
+m1_1_priors <- brm(
+  f1,
+  family = exgaussian(),
+  data = d_sample, #data
+  prior = priors_1,
+  sample_prior = "only",
+  iter = 2000,
+  init = 0,
+  chains = 2,
+  control = list(adapt_delta = .80, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+#pp_check(m1_1_priors)
+
+#ggplot(d_sample, aes(RL, group = relation_type, fill= relation_type)) +
+  #geom_histogram(alpha =.3)
+
+#m1_1 <- brm(
+#  f1,
+#  family = exgaussian(),
+#  data = data,
+#  prior = priors_1,
+#  sample_prior = T,
+#  iter = 2000,
+#  chains = 2,
+#  cores = 2,
+#  init = 0,
+#  control = list(adapt_delta = .80, max_treedepth = 15),
+#  save_pars = save_pars(all = TRUE))
+
+#_____________________________________________________________
+#MODEL ON THE WHOLE DATA SET
+
+m1_1_2 <- brm(
+  f1,
+  family = exgaussian(),
+  data = data,
+  prior = priors_1_1,
+  sample_prior = T,
+  iter = 4000,
+  chains = 2,
+  cores = 2,
+  init = 0,
+  control = list(adapt_delta = .99, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+#write_rds(m1_1_2, "model_1_2.rds")
+
+
+pp_check(model_1_2, ndraws = 50) + labs(title = "Posterior check, model 1") + theme_bw() + theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+summary(model_1_2)
+
+#_____________________________________________________________
+#MODEL 1_2 ESTIMATES (AFTER LOADING THE SAVED MODEL)
+post1 <- as_draws_df(model_1_2)
+variables(post1)
+
+#_____________________________________________________________
+#PRIOR - POSTERIOR CHECKS
+
+m1_p1 <- ggplot(post1) +
+  geom_histogram(aes(prior_b), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(b_relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(b_relation_typestrangers), fill ="#808000", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  ggtitle("Prior - posterior update check: slopes") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Slopes (gaussian component)")
+
+m1_p2 <- ggplot(post1) +
+  geom_histogram(aes(prior_b_beta), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(b_beta_relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(b_beta_relation_typestrangers), fill ="#808000", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: slopes") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Slopes (exponential component)")
+
+m1_p3 <- ggplot(post1) +
+  geom_histogram(aes(prior_sd_conversationID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_conversationID__Intercept), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Conversations SD")
+
+m1_p4 <- ggplot(post1) +
+  geom_histogram(aes(prior_sd_ID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_ID__relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(sd_ID__relation_typestrangers), fill ="#808000", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Participants SD")
+  
+m1_p5 <- ggplot(post1) +
+  geom_histogram(aes(prior_sigma), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sigma), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: sigma") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Sigma")
+
+m1_p6 <- ggplot(post1) +
+  geom_histogram(aes(prior_cor_ID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(cor_ID__relation_typefriends__relation_typestrangers), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: correlation") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Correlation")
+  
+#m1_1_full <- update(m1_1, newdata = data)
+#plot(hypothesis(m1_1, "b_conn_typefriends > b_conn_typestrangers", class = ""))
+#plot(hypothesis(m1_1, "b_beta_conn_typefriends > b_beta_conn_typestrangers", class = ""))
+#ggplot(post) + geom_density(aes(b_relation_typefriends - b_relation_typestrangers)) + geom_vline(xintercept = 0)
+
+
+#Plots relation_type estimates for F and S.
+#plot(conditional_effects(model_1_2))
+
+#Prior-posterior check plots:
+m1_p1
+m1_p2
+m1_p3
+m1_p4
+m1_p5
+
+#SAVING PLOTS
+#ggsave("m1_slopes_b.png", plot = m1_p1, width = 6, height = 4)
+#ggsave("m1_slopes_beta.png", plot = m1_p2, width = 6, height = 4)
+#ggsave("m1_sd_conversations.png", plot = m1_p3, width = 6, height = 4)
+#ggsave("m1_sd_subjects.png", plot = m1_p4, width = 6, height = 4)
+#ggsave("m1_sigma.png", plot = m1_p5, width = 6, height = 4)
+#ggsave("m6_corr.png", plot = m1_p6, width = 6, height = 4)
+
+#HYPOTHESIS TESTING
+
+#Do friends, on average, make longer pauses than friends?
+hypothesis(model_1_2, "relation_typefriends > relation_typestrangers")
+
+#Do friends produce longer pauses overall?
+hypothesis(model_1_2, "beta_relation_typefriends > beta_relation_typestrangers")
+```
+
+
+How many individuals follow the pattern of population?
+```{r}
+# Creating a data frame:
+
+counterfactual <- tibble(expand_grid(ID = unique(data$ID), relation_type = c("friends", "strangers")))
+counterfactual$conversationID <- seq(1000, 999 + nrow(counterfactual))
+counterfactual$ID <- as.factor(counterfactual$ID)
+counterfactual$relation_type <- as.factor(counterfactual$relation_type)
+
+# Running predictions
+counterfactual$predictions <- predict(model_1_2, newdata = counterfactual, allow_new_levels = T)[,1]
+counterfactual$friends <- ifelse(counterfactual$relation_type == "friends", 1, 0)
+
+# Plot
+predictions_1 <- ggplot(counterfactual, aes(x = friends, y = predictions, group = ID, color = ID)) + geom_line(alpha = 0.3) + 
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) + theme_bw() +
+  scale_x_continuous(limits = c(0, 1), breaks = c(0, 1)) +
+  xlab("Relation type") + ylab("Predictions") + theme(plot.title = element_text(hjust = 0.5), legend.position = "none") + ggtitle("Prediction of response times")
+
+predictions_1
+#ggsave("m1_predictions.png", plot = predictions_1, width = 6, height = 4)
+```
+
+
+Plotting b_beta distributions of friends and strangers (ex-Gaussian part):
+```{r}
+beta_estimates <- tibble(   
+  Type = c("Friends", "Strangers"),
+  Mean = c(NA, NA),
+  Upper = c(NA, NA),
+  Lower = c(NA, NA)
+)
+
+beta_estimates[1,2] <- mean(exp(post1$b_beta_relation_typefriends))
+beta_estimates[1,3] <- quantile(exp(post1$b_beta_relation_typefriends), 0.975)
+beta_estimates[1,4] <- quantile(exp(post1$b_beta_relation_typefriends), 0.025)
+
+beta_estimates[2,2] <- mean(exp(post1$b_beta_relation_typestrangers))
+beta_estimates[2,3] <- quantile(exp(post1$b_beta_relation_typestrangers), 0.975)
+beta_estimates[2,4] <- quantile(exp(post1$b_beta_relation_typestrangers), 0.025)
+
+beta_plot <- beta_estimates %>% 
+  ggplot(aes(x = Type, y = Mean, ymin = Lower, ymax = Upper,  color = c("red", "blue"))) +
+  geom_pointrange(fatten = 1/2) + 
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) + theme_bw() +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  xlab("Relation type") + ylab("Response times (estimates)") + ggtitle("Average RTs (exponential component)") + theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+#beta_plot
+ggsave("m1_beta_plot.png", plot = beta_plot, width = 7, height = 5)
+
+# The difference in ex-Gaussian component's average RT.
+mean(exp(post1$b_beta_relation_typefriends)) - mean(exp(post1$b_beta_relation_typestrangers))
+```
+
+
+Plotting b distributions of friends and strangers (Gaussian part):
+```{r}
+b_estimates <- tibble(   
+  Type = c("Friends", "Strangers"),
+  Mean = c(NA, NA),
+  Upper = c(NA, NA),
+  Lower = c(NA, NA)
+)
+
+b_estimates[1,2] <- mean(post1$b_relation_typefriends)
+b_estimates[1,3] <- quantile(post1$b_relation_typefriends, 0.975)
+b_estimates[1,4] <- quantile(post1$b_relation_typefriends, 0.025)
+
+b_estimates[2,2] <- mean(post1$b_relation_typestrangers)
+b_estimates[2,3] <- quantile(post1$b_relation_typestrangers, 0.975)
+b_estimates[2,4] <- quantile(post1$b_relation_typestrangers, 0.025)
+
+b_plot <- b_estimates %>% 
+  ggplot(aes(x = Type, y = Mean, ymin = Lower, ymax = Upper, color = c("red", "blue"))) +
+  geom_pointrange(fatten = 1/2) + 
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) + theme_bw() +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  xlab("Relation type") + ylab("Response times (estimates)") + ggtitle("Average RTs (Gaussian component)") + theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+b_plot
+#ggsave("m1_b_plot.png", plot = b_plot, width = 7, height = 5)
+```
+
+
+*Model 2: Reciprocal adaptation*:
+```{r}
+#FORMULA
+f2 <- bf(RL_s ~ 0 + relation_type +
+                  relation_type:OtherPrevGap_s +
+                  relation_type:SelfPrevGap_s +
+              (0 + relation_type + relation_type:OtherPrevGap_s + relation_type:SelfPrevGap_s | ID) + 
+              (1 | conversationID))
+
+get_prior(f2, data = data, family = gaussian)
+
+#PRIORS
+priors_2 <- c(
+  prior(normal(0, 0.5), class = b), ## prior for the betas            
+  prior(normal(0, 0.5), class = sd), ## prior for the random effects
+  prior(normal(0, 1), class = sigma)) ## prior for the errors in the model
+
+m2_priors <- brm(
+  f2,
+  family = gaussian(),
+  data = d_sample, #data
+  prior = priors_2,
+  sample_prior = "only",
+  iter = 2000,
+  init = 0,
+  chains = 2,
+  control = list(adapt_delta = .80, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+pp_check(m2_priors, ndraws=100) + labs(title = "Prior check, model 2")
+
+#MODEL
+m2_posterior <- brm(
+  f2,
+  family = gaussian(),
+  data = data,
+  prior = priors_2,
+  sample_prior = T,
+  iter = 2000,
+  init = 0,
+  chains = 2,
+  control = list(adapt_delta = .80, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+#write_rds(m2_posterior, "model_2.rds")
+
+pp_check(model_2, ndraws=50) + labs(title = "Posterior check, model 2") + theme_bw() + theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+# Inspecting the model parameters:
+summary(model_2)
+
+post2 <- as_draws_df(model_2)
+
+#__________________________________________________________________________________________
+# Plots
+
+m2_p1 <- ggplot(post2) +
+  geom_histogram(aes(prior_b), fill = "#483C32", alpha = 0.3) +
+  geom_histogram(aes(b_relation_typefriends), fill = "#D2691E", alpha = 0.3) +
+  geom_histogram(aes(b_relation_typestrangers), fill = "#808000", alpha = 0.3) +
+  geom_histogram(aes(`b_relation_typefriends:OtherPrevGap_s`), fill = "#BC8F8F", alpha = 0.3) +
+  geom_histogram(aes(`b_relation_typestrangers:OtherPrevGap_s`), fill = "#DAA520", alpha = 0.3) +
+  geom_histogram(aes(`b_relation_typefriends:SelfPrevGap_s`), fill = "#A0522D", alpha = 0.3) +
+  geom_histogram(aes(`b_relation_typestrangers:SelfPrevGap_s`), fill = "#8F9779", alpha = 0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: slopes") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Slopes") + guides(fill = "none")
+
+
+m2_p2 <- ggplot(post2) +
+  geom_histogram(aes(prior_sd_ID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_ID__relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(sd_ID__relation_typestrangers), fill ="#808000", alpha=0.3) +
+  geom_histogram(aes(`sd_ID__relation_typefriends:OtherPrevGap_s`), fill = "#BC8F8F", alpha = 0.3) +
+  geom_histogram(aes(`sd_ID__relation_typestrangers:OtherPrevGap_s`), fill = "#DAA520", alpha = 0.3) +
+  geom_histogram(aes(`sd_ID__relation_typefriends:SelfPrevGap_s`), fill = "#A0522D", alpha = 0.3) +
+  geom_histogram(aes(`sd_ID__relation_typestrangers:SelfPrevGap_s`), fill = "#8F9779", alpha = 0.3) +
+  theme_bw()  +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Participants SD") 
+
+
+m2_p3 <- ggplot(post2) +
+  geom_histogram(aes(prior_sd_conversationID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_conversationID__Intercept), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Conversations SD") 
+
+
+m2_p4 <- ggplot(post2) +
+  geom_histogram(aes(prior_sigma), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sigma), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: sigma") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Sigma")
+
+
+m2_p5 <- ggplot(post2) +
+  geom_histogram(aes(prior_cor_ID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(cor_ID__relation_typefriends__relation_typestrangers), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends__relation_typefriends:OtherPrevGap_s`), fill ="#808000", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typestrangers__relation_typefriends:OtherPrevGap_s`), fill = "#BC8F8F", alpha = 0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends__relation_typestrangers:OtherPrevGap_s`), fill = "#DAA520", alpha = 0.3) +
+  geom_histogram(aes(`cor_ID__relation_typestrangers__relation_typestrangers:OtherPrevGap_s`), fill = "#A0522D", alpha = 0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends:OtherPrevGap_s__relation_typestrangers:OtherPrevGap_s`), fill = "#8F9779", alpha = 0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends__relation_typefriends:SelfPrevGap_s`), fill ="orange", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends:OtherPrevGap_s__relation_typefriends:SelfPrevGap_s`), fill ="darkgreen", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typestrangers:OtherPrevGap_s__relation_typefriends:SelfPrevGap_s`), fill ="darkred", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends__relation_typestrangers:SelfPrevGap_s`), fill ="pink", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typestrangers__relation_typestrangers:SelfPrevGap_s`), fill ="sandybrown", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends:OtherPrevGap_s__relation_typestrangers:SelfPrevGap_s`), fill ="lemonchiffon3", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typestrangers:OtherPrevGap_s__relation_typestrangers:SelfPrevGap_s`), fill ="peachpuff2", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends:SelfPrevGap_s__relation_typestrangers:SelfPrevGap_s`), fill ="chocolate3", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: Correlation") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Correlation")
+
+m2_p1
+m2_p2
+m2_p3
+m2_p4
+m2_p5
+
+#SAVING PLOTS
+#ggsave("m2_slope.png", plot = m2_p1, width = 6, height = 4)
+#ggsave("m2_participants_sd.png", plot = m2_p2, width = 6, height = 4)
+#ggsave("m2_conversations_sd.png", plot = m2_p3, width = 6, height = 4)
+#ggsave("m2_sigma.png", plot = m2_p4, width = 6, height = 4)
+#ggsave("m2_correlation.png", plot = m2_p5, width = 6, height = 4)
+
+#A nalysis
+
+# Concerning participants' behavior based on their partners' behavior:
+
+# In friends conversations, interlocutor tends to adjust the time to the one of the partner's:
+hypothesis(model_2, "relation_typefriends:OtherPrevGap_s > 0")
+
+# In strangers' conversations, interlocutor does not adjust own time to the one of the partner's:
+hypothesis(model_2, "relation_typestrangers:OtherPrevGap_s > 0")
+
+hypothesis(model_2, "relation_typefriends:OtherPrevGap_s > relation_typestrangers:OtherPrevGap_s")
+
+#-----------
+# Concerning participants' behavior based on own behavior in the previous turn:
+
+# Whenever participant makes the previous gap longer, the further gaps tend to be a bit longer as well (friends):
+hypothesis(model_2, "relation_typefriends:SelfPrevGap_s > 0")
+
+# Result with strangers is about the same as with friends:
+hypothesis(model_2, "relation_typestrangers:SelfPrevGap_s > 0")
+
+# No difference between friends and strangers:
+hypothesis(model_2, "relation_typefriends:SelfPrevGap_s = relation_typestrangers:SelfPrevGap_s")
+
+#-----------
+
+hypothesis(model_2, "relation_typefriends:OtherPrevGap_s > relation_typefriends:SelfPrevGap_s")
+
+hypothesis(model_2, "relation_typestrangers:OtherPrevGap_s > relation_typestrangers:SelfPrevGap_s")
+```
+
+
+Simulating data for model 2 interpretation and plots:
+```{r}
+set.seed(12)
+# Model 2 - Reciprocal model
+
+# Creating a data frame
+
+data_m2 <- as_tibble(
+  expand.grid(
+    relation_type = c("friends", "strangers"), 
+    OtherPrevGap_s = c(-1, 0, 1),
+    SelfPrevGap_s = c(-1, 0, 1),
+    ID = 1000
+  )
+)
+
+data_m2$conversationID <- ifelse(data_m2$relation_type == "friends", "1000", "2000")
+data_m2$ID <- as.factor(data_m2$ID)
+
+# Running predictions
+data_m2$Predictions <- predict(model_2, newdata=data_m2, allow_new_levels = T)[,1]
+
+data_m2$SelfPrevGap_s <- as.factor(data_m2$SelfPrevGap_s)
+data_m2$OtherPrevGap_s <- as.factor(data_m2$OtherPrevGap_s)
+
+# Plots
+
+int_plot_1 <- ggplot(data_m2, aes(x = OtherPrevGap_s, 
+                                  y = Predictions, 
+                                  group = SelfPrevGap_s, 
+                                  color = SelfPrevGap_s)) + 
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        strip.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  geom_line() + facet_wrap(.~relation_type) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Predicted response times (based on partner's behavior)") +
+  labs(color = "Self RT") +
+  ylab("Predictions (RTs)") +
+  xlab("Partner's response time in previous turn")
+
+int_plot_2 <-ggplot(data_m2, aes(x = SelfPrevGap_s, 
+                                 y = Predictions, 
+                                 group = OtherPrevGap_s, 
+                                 color = OtherPrevGap_s)) + 
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        strip.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  geom_line() + facet_wrap(.~relation_type) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Predicted response times (based on participant's own behavior)") +
+  labs(color = "Partner's RT") +
+  ylab("Predictions (RTs)") +
+  xlab("One's own response time in previous turn")
+
+
+
+int_plot_1
+#ggsave("m2_int_plot_1.png", plot = int_plot_1, width = 6, height = 4)
+
+int_plot_2
+#ggsave("m2_int_plot_2.png", plot = int_plot_2, width = 6, height = 4)
+```
+
+
+
+*Model 3: model 1 + number of words in the previous sentence*
+```{r}
+#Scaling the PrevWordsNum variable, so that all variables would be on the same scale
+data <- data %>%
+  group_by(ID, conversationID) %>% 
+  mutate(PrevWordsNum_s = scale(PrevWordsNum))
+
+f3 <- bf(RL_s ~ 0 + relation_type + relation_type:PrevWordsNum_s +
+           (0 + relation_type + relation_type:PrevWordsNum_s | ID) +
+           (1 | conversationID)) # accounts for variability in RL_s that is shared among observations within the same conversation
+
+#Prior table:
+suppressWarnings({
+  get_prior(f3, data = data, family = gaussian)
+})
+
+priors_3 <- c(
+  prior(normal(0, .5), class = b),           
+  prior(normal(0, .5), class = sd),
+  prior(normal(0, 1), class = sigma)
+)
+
+# The model below samples the priors:
+
+m3_priors <- brm(
+  f3,
+  family = gaussian(),
+  data = d_sample,
+  prior = priors_3,
+  sample_prior = "only",
+  iter = 2000,
+  init = 0,
+  chains = 2,
+  control = list(adapt_delta = .8, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+pp_check(m3_priors, ndraws=100) + labs(title = "Posterior check, model 3") + theme(
+  panel.background = element_rect(fill = "transparent"),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(), 
+  plot.title = element_text(hjust = 0.5, face = "bold"))
+
+m3_posterior <- brm(
+  f3,
+  family = gaussian(),
+  data = data,
+  prior = priors_3,
+  sample_prior = T,
+  iter = 4000,
+  init = 0,
+  chains = 2,
+  control = list(adapt_delta = .99, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+pp_check(model_3, ndraws = 50) + labs(title = "Posterior check, model 3")  + theme_bw() + theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+#update(m3_posterior, newdata = data)
+#write_rds(m3_posterior, "model_3.rds")
+
+summary(model_3)
+
+post3 <- as_draws_df(model_3)
+
+
+#PLOTS__________________________________________________________________________
+m3_p1 <- ggplot(post3) +
+  geom_histogram(aes(prior_b), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(b_relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(b_relation_typestrangers), fill ="#808000", alpha=0.3) +
+  geom_histogram(aes(`b_relation_typefriends:PrevWordsNum_s`), fill = "#BC8F8F", alpha = 0.3) +
+  geom_histogram(aes(`b_relation_typestrangers:PrevWordsNum_s`), fill = "#DAA520", alpha = 0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: slopes") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Slopes") 
+
+m3_p2 <- ggplot(post3) +
+  geom_histogram(aes(prior_sd_ID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_ID__relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(sd_ID__relation_typestrangers), fill ="#808000", alpha=0.3) +
+  geom_histogram(aes(`sd_ID__relation_typefriends:PrevWordsNum_s`), fill = "#BC8F8F", alpha = 0.3) +
+  geom_histogram(aes(`sd_ID__relation_typestrangers:PrevWordsNum_s`), fill = "#DAA520", alpha = 0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Participants SD") 
+
+
+m3_p3 <- ggplot(post3) +
+  geom_histogram(aes(prior_sd_conversationID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_conversationID__Intercept), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Conversations SD") 
+
+m3_p4 <- ggplot(post3) +
+  geom_histogram(aes(prior_sigma), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sigma), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: sigma") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Sigma") 
+
+m3_p5 <- ggplot(post3) +
+  geom_histogram(aes(prior_cor_ID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(cor_ID__relation_typefriends__relation_typestrangers), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends__relation_typefriends:PrevWordsNum_s`), fill ="#808000", alpha=0.3) +
+  geom_histogram(aes(`cor_ID__relation_typestrangers__relation_typefriends:PrevWordsNum_s`), fill = "#BC8F8F", alpha = 0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends__relation_typestrangers:PrevWordsNum_s`), fill = "#DAA520", alpha = 0.3) +
+  geom_histogram(aes(`cor_ID__relation_typestrangers__relation_typestrangers:PrevWordsNum_s`), fill = "#A0522D", alpha = 0.3) +
+  geom_histogram(aes(`cor_ID__relation_typefriends:PrevWordsNum_s__relation_typestrangers:PrevWordsNum_s`), fill ="orange", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: Correlation") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Correlation") 
+
+m3_p1
+m3_p2
+m3_p3
+m3_p4
+m3_p5
+
+#SAVING PLOTS
+#ggsave("m3_slope.png", plot = m3_p1, width = 6, height = 4)
+#ggsave("m3_participants_sd.png", plot = m3_p2, width = 6, height = 4)
+#ggsave("m3_conversations_sd.png", plot = m3_p3, width = 6, height = 4)
+#ggsave("m3_sigma.png", plot = m3_p4, width = 6, height = 4)
+#ggsave("m3_correlation.png", plot = m3_p5, width = 6, height = 4)
+
+summary(model_3)
+
+hypothesis(model_3, "relation_typefriends > 0")
+hypothesis(model_3, "relation_typestrangers > 0")
+hypothesis(model_3, "relation_typefriends > relation_typestrangers")
+
+hypothesis(model_3, "relation_typefriends:PrevWordsNum_s > 0")
+hypothesis(model_3, "relation_typestrangers:PrevWordsNum_s > 0")
+hypothesis(model_3, "relation_typestrangers:PrevWordsNum_s = relation_typefriends:PrevWordsNum_s")
+
+```
+
+
+Prediction plot, model 3:
+```{r}
+data_m3 <- as_tibble(
+  expand.grid(
+    relation_type = c("friends", "strangers"), 
+    PrevWordsNum_s = c(-1, 0, 1),
+    ID = 1000
+  )
+)
+data_m3$conversationID <- ifelse(data_m3$relation_type == "friends", "1000", "2000")
+data_m3$ID < as.factor(data_m3$ID)
+data_m3$Predictions <- predict(model_3, newdata=data_m3, allow_new_levels = T)[,1]
+
+
+int_plot_3 <- ggplot(data_m3, aes(x = PrevWordsNum_s, 
+                                  y = Predictions,
+                                  color = relation_type)) + 
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        strip.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  geom_line() + facet_wrap(.~relation_type) +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none") +
+  ggtitle("Predicted response times (based on word count)") +
+  ylab("Predictions (RTs)") +
+  xlab("Number of words in the previous turn")
+  #scale_color_manual(values = c("friends" = "skyblue", "strangers" = "darkblue"))  # Set your own colors
+
+int_plot_3
+
+#ggsave("m3_int_plot_1.png", plot = int_plot_3, width = 6, height = 4)
+```
+
+
+*Model 4: Do people, that talk to the same participant, behave in similar ways?*
+```{r}
+f4 <- bf(RL_s ~ 0 + relation_type +
+           (0 + relation_type  | participantID) +
+           (0 + relation_type | interlocutorID) +
+           (1 | conversationID)) 
+
+suppressWarnings({
+  get_prior(f4, data = data, family = gaussian)
+})
+
+priors_4 <- c(
+  prior(normal(0, .5), class = b),           
+  prior(normal(0, .5), class = sd),
+  prior(normal(0, 1), class = sigma)
+)
+
+# The model below samples the priors:
+
+m4_priors <- brm(
+  f4,
+  family = gaussian(),
+  data = d_sample,
+  prior = priors_4,
+  sample_prior = "only",
+  iter = 2000,
+  init = 0,
+  chains = 2,
+  control = list(adapt_delta = .8, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+pp_check(m4_priors, ndraws=100) + labs(title = "Prior predictive check, model 4") + theme(
+  panel.background = element_rect(fill = "transparent"),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(), 
+  plot.title = element_text(hjust = 0.5, face = "bold"))
+
+m4_posterior <- brm(
+  f4,
+  family = gaussian(),
+  data = data,
+  prior = priors_4,
+  sample_prior = T,
+  iter = 4000,
+  init = 0,
+  chains = 2,
+  control = list(adapt_delta = .99, max_treedepth = 15),
+  save_pars = save_pars(all = TRUE))
+
+pp_check(model_4, ndraws=50) + labs(title = "Posterior check: model 4") + theme_bw() + theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+summary(model_4)
+
+#write_rds(m4_posterior, "model_4.rds")
+
+post4 <- as_draws_df(model_4)
+
+#SLOPES
+
+m4_p1 <- ggplot(post4) +
+  geom_histogram(aes(prior_b), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(b_relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(b_relation_typestrangers), fill ="#808000", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: slopes") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Slopes")
+
+#SIGMA
+
+m4_p2 <- ggplot(post4) +
+  geom_histogram(aes(prior_sigma), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sigma), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: sigma") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Sigma")
+
+# SD
+
+m4_p3 <- ggplot(post4) +
+  geom_histogram(aes(prior_sd_conversationID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_conversationID__Intercept), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Conversations SD")
+
+m4_p4 <- ggplot(post4) +
+  geom_histogram(aes(prior_sd_interlocutorID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_interlocutorID__relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(sd_interlocutorID__relation_typestrangers), fill ="#808000", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Interlocutors SD")
+
+m4_p5 <- ggplot(post4) +
+  geom_histogram(aes(prior_sd_participantID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(sd_participantID__relation_typefriends), fill ="#D2691E", alpha=0.3) +
+  geom_histogram(aes(sd_participantID__relation_typestrangers), fill ="#808000", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: SD") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Between-Participants SD")
+
+# CORRELATION
+
+m4_p6 <- ggplot(post4) +
+  geom_histogram(aes(prior_cor_interlocutorID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(cor_interlocutorID__relation_typefriends__relation_typestrangers), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: correlation between interlocutors") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Correlation")
+
+m4_p7 <- ggplot(post4) +
+  geom_histogram(aes(prior_cor_participantID), fill ="#483C32", alpha=0.3) +
+  geom_histogram(aes(cor_participantID__relation_typefriends__relation_typestrangers), fill ="#8B4513", alpha=0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  ggtitle("Prior - posterior update check: correlation between participants") + theme(plot.title = element_text(hjust = 0.5, face = "bold")) +
+  xlab("Correlation")
+
+m4_p1
+m4_p2
+m4_p3
+m4_p4
+m4_p5
+m4_p6
+m4_p7
+
+hypothesis(model_4, "sd(relation_typefriends) > sd(relation_typestrangers)")
+
+#ggsave("m4_p1.png", plot = m4_p1, width = 6, height = 4, dpi = 300)
+#ggsave("m4_p2.png", plot = m4_p2, width = 6, height = 4, dpi = 300)
+#ggsave("m4_p3.png", plot = m4_p3, width = 6, height = 4, dpi = 300)
+#ggsave("m4_p4.png", plot = m4_p4, width = 6, height = 4, dpi = 300)
+#ggsave("m4_p5.png", plot = m4_p5, width = 6, height = 4, dpi = 300)
+#ggsave("m4_p6.png", plot = m4_p6, width = 6, height = 4, dpi = 300)
+#ggsave("m4_p7.png", plot = m4_p7, width = 6, height = 4, dpi = 300)
+```
+
+
+Simulating data for easier interpretation and plots, model 4:
+```{r}
+# Model 4 - similarity in behavior across multiple interlocutors
+
+# Creating two subsets with friends-only and strangers-only data.
+
+data_m4_f <- subset(data, relation_type == "friends")
+data_m4_s <- subset(data, relation_type == "strangers")
+
+
+# Creating a subset of participants, that had a conversation with strangers, but also with friends:
+
+# These ID numbers are of participants, that talked to strangers but also brought a friend, so extracting the rows only for those participants:
+data_m4_both_f <- data_m4_f[data_m4_f$participantID %in% c(4, 5, 8, 11, 25, 23, 21, 63, 101, 107, 110, 66, 29, 30, 68, 86, 85, 44, 50, 48, 49, 67), ]
+
+data_m4_both_s <- data_m4_s[data_m4_s$participantID %in% c(4, 5, 8, 11, 25, 23, 21, 63, 101, 107, 110, 66, 29, 30, 68, 86, 85, 44, 50, 48, 49, 67), ]
+
+# Combining both data sets into one:
+data_m4_both <- rbind(data_m4_both_f, data_m4_both_s)
+
+
+# Extract only IDs + relation type and save it in order to be used in model predictions:
+data_m4_both <- data_m4_both[c('participantID', 'interlocutorID', 'relation_type')]
+data_m4_both$relation_type <- as.factor(data_m4_both$relation_type)
+data_m4_both$participantID <- as.factor(data_m4_both$participantID)
+data_m4_both$interlocutorID <- as.factor(data_m4_both$interlocutorID)
+
+# Giving new IDs for cleaner and more readable plot:
+
+current_id <- c(4, 5, 8, 11, 25, 23, 21, 63, 101, 107, 110, 66, 29, 30, 68, 86, 85, 44, 50, 48, 49, 67)
+indeces <- c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V')
+
+new_values <- data.frame(
+  current_id = c(4, 5, 8, 11, 25, 23, 63, 101, 107, 110, 66, 29, 30, 21, 68, 86, 85, 44, 50, 48, 49, 67),
+  indeces = c('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V')
+)
+new_values$indeces <- as.factor(new_values$indeces)
+
+# Applying those IDs:
+data_m4_both$participant <- new_values$indeces[match(data_m4_both$participantID, new_values$current_id)]
+
+# Get unique combinations of "participant" and "interlocutorID"
+data_m4_both$participant <- as.character(data_m4_both$participant)
+data_m4_both$interlocutorID <- as.character(data_m4_both$interlocutorID)
+
+# Subsetting so that it would possible to distinguish unique pairs for F and S:
+f_data <- subset(data_m4_both, relation_type == "friends")
+s_data <- subset(data_m4_both, relation_type == "strangers")
+
+pairs_f <- unique(f_data[, c("participant", "interlocutorID")])
+pairs_s <- unique(s_data[, c("participant", "interlocutorID")])
+
+# Adding relation type columns to each pair:
+
+pairs_f$relation_type <- "friends"
+pairs_s$relation_type <- "strangers"
+
+# Combining to one:
+
+pairs_both <- rbind(pairs_f, pairs_s)
+pairs_both$conversationID <- seq(1:165)
+colnames(pairs_both)[colnames(pairs_both) == "participant"] <- "participantID"
+#pairs_both <- subset(pairs_both, select = -Predictions)
+
+# Running predictions:
+
+set.seed(77)
+pairs_both$Predictions <- predict(model_4, newdata = pairs_both, allow_new_levels = T)[,1]
+
+# Plot:
+
+int_plot_4 <- ggplot(pairs_both, aes(x = participantID,
+                                  y = Predictions,
+                                  #group = participant,
+                                  color = relation_type)) + 
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        strip.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  geom_point(alpha = 0.5) +
+  geom_line()+
+  #stat_summary(fun = mean, geom = "point", fill = "blue", position = "dodge") +
+  #stat_summary(fun.data = mean_sdl, geom = "errorbar", width = 0.2) +
+  #geom_errorbar(aes(ymin = min, ymax = max, width = 0.2)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  geom_hline(yintercept = 0, color = "black") +
+  ggtitle("Similarity in response times") +
+  labs(color = "Relation type") +
+  ylab("Predictions (RTs)") +
+  xlab("Participant's ID")
+int_plot_4
+
+#ggsave("m4_int_plot_1.png", plot = int_plot_4, width = 6, height = 4)
+```
+
+
+Preparing data set to plot means:
+```{r}
+# Get unique combinations of "group" and "subgroup"
+data_m4_both$participant <- as.character(data_m4_both$participant)
+data_m4_both$interlocutorID <- as.character(data_m4_both$interlocutorID)
+
+f_data <- subset(data_m4_both, relation_type == "friends")
+s_data <- subset(data_m4_both, relation_type == "strangers")
+
+
+pairs_f <- unique(f_data[, c("participant", "interlocutorID")])
+pairs_s <- unique(s_data[, c("participant", "interlocutorID")])
+
+# FRIENDS
+
+# Initialize an empty data frame to store results
+results_f <- data_frame(participant = NA, interlocutorID = NA, Predictions = NA, relation_type = NA)
+
+# Loop through partners' combinations and calculate means
+for (i in seq(nrow(pairs_f))) {
+  current_participant <- pairs_f$participant[i]
+  current_interlocutor <- pairs_f$interlocutorID[i]
+  data <- subset(data_m4_both, participant == current_participant & interlocutorID == current_interlocutor)
+  mean_value <- mean(data$Predictions)
+  results_f <- rbind(results_f, data_frame(participant = current_participant, interlocutorID = current_interlocutor, Predictions = mean_value, relation_type = "friends"))
+}
+
+results_f <- results_f[-1, ]
+
+
+# STRANGERS
+
+results_s <- data_frame(participant = NA, interlocutorID = NA, Predictions = NA, relation_type = NA)
+
+for (i in seq(nrow(pairs_s))) {
+  current_participant <- pairs_s$participant[i]
+  current_interlocutor <- pairs_s$interlocutorID[i]
+  data <- subset(data_m4_both, participant == current_participant & interlocutorID == current_interlocutor)
+  mean_value <- mean(data$Predictions)
+  results_s <- rbind(results_s, data_frame(participant = current_participant, interlocutorID = current_interlocutor, Predictions = mean_value, relation_type = "strangers"))
+}
+
+results_s <- results_s[-1, ]
+
+#----------------------------
+
+# Now, create data sets that have mean of means, and the sd of means.
+
+# Friends
+
+data_f1 <- data_frame(participant = NA, mean_predictions = NA, min_prediction = NA, max_prediction = NA, relation_type = NA)
+
+# Calculate the mean, minimum, and maximum Count per Participant
+result_final_f <- aggregate(Predictions ~ participant, results_f, FUN = function(x) c(Mean = mean(x), Min = min(x), Max = max(x)))
+
+as.data.frame(as.list(result_final_f))
+
+f_mean <- result_final_f$Predictions[,1]
+f_min <- result_final_f$Predictions[,2]
+f_max <- result_final_f$Predictions[,3]
+
+grand_friends <- data_frame(
+  participant = result_final_f$participant,
+  relation_type = rep("friends", 22), 
+  mean = f_mean,
+  min = f_min,
+  max = f_max
+)
+
+# Strangers
+
+data_s1 <- data_frame(participant = NA, mean_predictions = NA, min_prediction = NA, max_prediction = NA, relation_type = NA)
+
+# Calculate the mean, minimum, and maximum Count per Participant
+result_final_s <- aggregate(Predictions ~ participant, results_s, FUN = function(x) c(Mean = mean(x), Min = min(x), Max = max(x)))
+
+as.data.frame(as.list(result_final_s))
+
+s_mean <- result_final_s$Predictions[,1]
+s_min <- result_final_s$Predictions[,2]
+s_max <- result_final_s$Predictions[,3]
+
+grand_strangers <- data_frame(
+  participant = result_final_s$participant,
+  relation_type = rep("strangers", 22), 
+  mean = s_mean,
+  min = s_min,
+  max = s_max
+)
+
+grand_data <- rbind(grand_friends, grand_strangers)
+```
+
+
+PLOT:
+```{r}
+int_plot_5 <- ggplot(grand_data, aes(x = participant,
+                                  y = mean,
+                                  #group = interlocutorID,
+                                  color = relation_type)) + 
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        panel.background = element_blank(),
+        strip.background = element_blank(),
+        axis.line = element_line(size = 0.5)) +
+  geom_errorbar(aes(ymin = min, ymax = max, width = 0.2)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  geom_hline(yintercept = 0, color = "black") +
+  ggtitle("Similarity in response times") +
+  labs(color = "Relation type") +
+  ylab("Predictions (RTs)") +
+  xlab("Participant's ID")
+int_plot_5
+```
+
