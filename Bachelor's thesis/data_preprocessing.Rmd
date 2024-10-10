@@ -1,0 +1,155 @@
+---
+title: "Data preparation"
+author: "Justina Razanauskaite"
+date: "2023-09-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+Loading the packages:
+```{r}
+pacman::p_load(tidyverse, purr, dplyr, tidyr)
+```
+
+
+Combining all data of FRIENDS to one:
+```{r}
+
+# Creates a list of friends csv files:
+friends_files <- list.files(path = "/Users/justina/Desktop/Desktop/Aarhus_Uni/Semester_5/Bachelor_Thesis/data_analysis/turn_taking/friends", pattern = ".csv", full.names = TRUE)
+
+
+# Creates an empty list to store the files:
+friends_list <- list()
+
+
+# Loops and reads csv files, adds "index" column to keep track of separate conversations:
+friends_list <- map2(friends_files, 1:length(friends_files), function(file, conversationID) {
+  df <- read.csv(file)
+  df$conversationID <- conversationID
+  # Saves elements that are between "/friends/" and the last underscore:
+  df$file_name <- gsub(".*/friends/(.*).csv", "\\1", file)
+  df$SelfPrevGap <- lag(df$gap,2)
+  df$OtherPrevGap <- lag(df$gap,1)
+  df$PrevWordsNum <- lag(df$number_of_words,1)
+  return(df)
+})
+
+# Combines the data frames into one:
+friends_final <- bind_rows(friends_list)
+
+
+# Adding a column to indicate connection type: friends
+friends_final$conn_type <- "friends"
+
+
+# Adjusting conversation index:
+friends_final$conversationID <- paste0("f", friends_final$conversationID)
+```
+
+
+FRIENDS - Saving both speakers' IDs:
+```{r}
+id_key_friends <- read_csv("subject_id_key_friends.csv")
+
+for (i in seq(nrow(friends_final))) {
+  if (friends_final$file_name[i] %in% id_key_friends$video_name) {
+    index <- which(id_key_friends$video_name == friends_final$file_name[i]) #finds an index in id_key file, where it matches
+    if (friends_final$speaker[i] == "S1") {
+      friends_final$speaker[i] <- id_key_friends$S1[index]
+    } else {
+      friends_final$speaker[i] <- id_key_friends$S2[index]
+    }
+  }
+}
+
+friends_final <- friends_final %>%
+  separate(file_name, into = c("participantID", "interlocutorID"), sep = "_")
+```
+
+
+Combining all data of STRANGERS to one:
+```{r}
+strangers_files <- list.files(path = "/Users/justina/Desktop/Desktop/Aarhus_Uni/Semester_5/Bachelor_Thesis/data_analysis/turn_taking/strangers", pattern = ".csv", full.names = TRUE)
+
+strangers_list <- list()
+
+strangers_list <- map2(strangers_files, 1:length(strangers_files), function(file, conversationID) {
+  df <- read.csv(file)
+  df$conversationID <- conversationID
+  df$file_name <- gsub(".*/strangers/(.*).csv", "\\1", file)
+  df$SelfPrevGap <- lag(df$gap,2)
+  df$OtherPrevGap <- lag(df$gap,1)
+  df$PrevWordsNum <- lag(df$number_of_words,1)
+  return(df)
+})
+
+strangers_final <- bind_rows(strangers_list)
+
+strangers_final$conn_type <- "strangers"
+
+strangers_final$conversationID <- paste0("s", strangers_final$conversationID)
+```
+
+
+STRANGERS - Saving both speakers' IDs:
+```{r}
+id_key_strangers <- read_csv("subject_id_key_strangers.csv")
+
+for (i in seq(nrow(strangers_final))) {
+  if (strangers_final$file_name[i] %in% id_key_strangers$video_name) {
+    index <- which(id_key_strangers$video_name == strangers_final$file_name[i]) #finds an index in id_key file, where it matches
+    if (strangers_final$speaker[i] == "S1") {
+      strangers_final$speaker[i] <- id_key_strangers$S1[index]
+    } else {
+      strangers_final$speaker[i] <- id_key_strangers$S2[index]
+    }
+  }
+}
+
+strangers_final <- strangers_final %>%
+  separate(file_name, into = c("participantID", "interlocutorID"), sep = "_")
+```
+
+
+Combining all data into one:
+```{r}
+final_data <- rbind(friends_final, strangers_final)
+```
+
+
+Data with columns of interest:
+```{r}
+colnames(final_data)[colnames(final_data) == 'gap_length'] <- 'RL'
+colnames(final_data)[colnames(final_data) == 'speaker'] <- 'ID'
+colnames(final_data)[colnames(final_data) == 'conn_type'] <- 'relation_type'
+
+df <- final_data[, c("ID", "RL", "SelfPrevGap", "OtherPrevGap", "conversationID", "relation_type", "number_of_words", "PrevWordsNum", "participantID", "interlocutorID")]
+```
+
+
+Changing ms to s; scaling the variables:
+```{r}
+df$RL <- df$RL/1000
+df$SelfPrevGap <- df$SelfPrevGap/1000
+df$OtherPrevGap <- df$OtherPrevGap/1000
+
+df <- df %>% 
+  group_by(ID, conversationID) %>% 
+  mutate(RL_s = scale(RL), 
+         SelfPrevGap_s = scale(SelfPrevGap), 
+         OtherPrevGap_s = scale(OtherPrevGap))
+```
+
+
+Saving the data for further use:
+```{r}
+write.csv(df, file = "final_data.csv", row.names = TRUE)
+write.csv(friends_final, file = "friends_final.csv", row.names = TRUE)
+write.csv(strangers_final, file = "strangers_final.csv", row.names = TRUE)
+```
