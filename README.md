@@ -11,5 +11,6 @@ This repository is used for storing project, exam-related files and other resour
 - `/uni_course_spatial_analytics-Tasks`: Contains code and the paper of my exam project for Spatial analytics course.
 - `/uni_course_visual_analytics`: Contains code for 4 assignments of Language analytics course. Each assignment has its own subdirectory.
 - `/uni_course_adv_cog_modeling_portfolio`: Contains code for the portfolio type exam.
+- `/uni_course_data_science`: Contains code for the Data Science course exam with XGBoost analysis.
 
 
