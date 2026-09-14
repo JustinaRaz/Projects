@@ -1,0 +1,17 @@
+[project]
+name = "weaviate-vector-based-database"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.141.1",
+    "python-dotenv>=1.2.3",
+    "uvicorn>=0.53.0",
+    "weaviate-client[agents]>=4.23.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.6",
+]
