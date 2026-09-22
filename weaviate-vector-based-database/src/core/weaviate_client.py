@@ -1,17 +1,16 @@
-import os
-
 import weaviate
-from dotenv import load_dotenv
 from weaviate.classes.config import Configure
 from weaviate.classes.init import Auth
 
-load_dotenv()
+from src.core.settings import Settings, get_settings
 
 
 class WeaviateClient:
-    def __init__(self):
-        self.url = os.environ["WEAVIATE_URL"]
-        self.api_key = os.environ["WEAVIATE_API_KEY"]
+    def __init__(self, settings: Settings | None = None):
+        settings = settings or get_settings()
+
+        self.url = settings.weaviate_url
+        self.api_key = settings.weaviate_api_key
 
         self.client = weaviate.connect_to_weaviate_cloud(
             cluster_url=self.url,
@@ -20,11 +19,10 @@ class WeaviateClient:
 
     def close(self):
         self.client.close()
-        
-    def collection_exists(self, collection_name: str) -> bool:
-        return self.client.collections.exists(collection_name)
 
-    def create_collection(self, collection_name, description: str | None = None):
+    def create_collection(self, 
+                          collection_name: str, 
+                          description: str | None = None):
         return self.client.collections.create(
             name=collection_name,
             description=description,

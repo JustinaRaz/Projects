@@ -1,21 +1,19 @@
+import logging
+
 from fastapi import FastAPI
 
-from backend.routers import collection
-from backend.settings.client import WeaviateClient
+from core.logger_config import setup_logging
+from routers import collection, document
+from src.core.weaviate_client import WeaviateClient
 
+setup_logging()
+logger = logging.getLogger("app")
 
-def create_app() -> FastAPI:
-    app = FastAPI(
-        title="Practice Project",
-        description="Created for practicing reasons.",
-    )
+app = FastAPI(title="Practice Project", description="Created for practicing reasons.")
+logger.info("Application starting")
 
-    weaviate_client = WeaviateClient()
-    app.state.client = weaviate_client
+weaviate_client = WeaviateClient()
+app.state.client = weaviate_client
 
-    app.include_router(collection.router)
-
-    return app
-
-
-app = create_app()
+app.include_router(collection.router)
+app.include_router(document.router)
