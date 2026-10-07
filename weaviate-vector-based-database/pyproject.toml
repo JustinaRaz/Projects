@@ -8,8 +8,10 @@ dependencies = [
     "docling>=2.127.0",
     "fastapi>=0.141.1",
     "flagembedding>=1.4.2",
+    "langdetect>=1.0.9",
     "llama-index>=0.14.24",
     "numpy<2",
+    "pysbd>=0.3.4",
     "python-dotenv>=1.2.3",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
@@ -22,4 +24,13 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff>=0.16.6",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # your existing defaults, presumably
+    "BLE",           # flake8-blind-except: flags bare `except:` and overly broad `except Exception:`
+    "TRY",           # tryceratops: exception-handling best practices
+    "B",             # flake8-bugbear: includes several exception-related checks
+    "EM",            # flake8-errmsg: enforces good exception message practices
 ]

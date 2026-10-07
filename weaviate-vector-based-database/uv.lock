@@ -1422,6 +1422,15 @@ wheels = [
 ]
 
 [[package]]
+name = "langdetect"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474 }
+
+[[package]]
 name = "latex2mathml"
 version = "3.81.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2828,6 +2837,14 @@ wheels = [
 ]
 
 [[package]]
+name = "pysbd"
+version = "0.3.4"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/0a/c99fb7d7e176f8b176ef19704a32e6a9c6aafdf19ef75a187f701fc15801/pysbd-0.3.4-py3-none-any.whl", hash = "sha256:cd838939b7b0b185fcf86b0baf6636667dfb6e474743beeff878e9f42e022953", size = 71082 },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -4080,8 +4097,10 @@ dependencies = [
     { name = "docling" },
     { name = "fastapi" },
     { name = "flagembedding" },
+    { name = "langdetect" },
     { name = "llama-index" },
     { name = "numpy" },
+    { name = "pysbd" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "pyyaml" },
@@ -4101,8 +4120,10 @@ requires-dist = [
     { name = "docling", specifier = ">=2.127.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "flagembedding", specifier = ">=1.4.2" },
+    { name = "langdetect", specifier = ">=1.0.9" },
     { name = "llama-index", specifier = ">=0.14.24" },
     { name = "numpy", specifier = "<2" },
+    { name = "pysbd", specifier = ">=0.3.4" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "pyyaml", specifier = ">=6.0.3" },

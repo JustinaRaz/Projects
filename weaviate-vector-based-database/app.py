@@ -2,9 +2,13 @@ import logging
 
 from fastapi import FastAPI
 
-from core.logger_config import setup_logging
 from routers import collection, document
+from src.core.logger_config import setup_logging
+from src.core.settings import get_settings
 from src.core.weaviate_client import WeaviateClient
+
+settings = get_settings()
+settings.init_dirs()
 
 setup_logging()
 logger = logging.getLogger("app")
