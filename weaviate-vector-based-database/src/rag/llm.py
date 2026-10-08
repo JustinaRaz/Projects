@@ -31,6 +31,7 @@ class Gemma:
         self.model_id = self.llm_config["model_name"]
         self.tokenizer = None
         self.context_builder = None
+        self.cache_dir = settings.llm_dir
 
     def _load(self):
 
@@ -40,7 +41,8 @@ class Gemma:
         logger.info("Loading the model and its processor.")
 
         if self.processor is None:
-            self.processor = AutoProcessor.from_pretrained(self.model_id)
+            self.processor = AutoProcessor.from_pretrained(self.model_id,
+                                                           cache_dir = self.cache_dir )
 
         if self.model is None:
             dtype = self.llm_config["torch_dtype"]
@@ -51,10 +53,16 @@ class Gemma:
                 self.model_id,
                 dtype=dtype,
                 device_map=self.llm_config["device"],
+                cache_dir=self.cache_dir
             ).eval()
 
         if self.tokenizer is None:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+
+        self.context_builder = ContextBuilder(
+                                tokenizer=self.tokenizer,
+                                max_context_tokens=self.llm_config["max_context_tokens"]
+                            )
 
     def _format_params(self) -> dict:
         """Sampling kwargs for generate(); empty dict -> greedy decoding."""
@@ -111,11 +119,7 @@ class Gemma:
     def generate(self, question: str, context: dict) -> str:
         self._load()
 
-        context_builder = ContextBuilder(
-                        tokenizer=self.tokenizer,
-                        max_context_tokens=self.llm_config["max_context_tokens"]
-                    )
-        context = context_builder.build_context(context)
+        context = self.context_builder.build_context(context)
 
         kwargs = self._format_params()
         do_sample = len(kwargs) > 0
@@ -147,14 +151,13 @@ class Gemma:
             )
 
         raw = self.processor.decode(output[0][input_len:], skip_special_tokens=True)
-        llm_logger.debug("LLM RAW OUTPUT:\n%s", raw)
         try:
             response = json.loads(raw)
             answer = response["answer"]
+            llm_logger.debug("LLM EXTRACTED OUTPUT:\n%s", raw)
         except (json.JSONDecodeError, KeyError):
             logger.warning("Model returned invalid JSON, using raw text")
             answer = raw
-
-        llm_logger.debug("LLM OUTPUT:\n%s", answer)
+            llm_logger.debug("LLM RAW OUTPUT:\n%s", answer)
 
         return answer

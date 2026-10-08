@@ -5,3 +5,4 @@ max_new_tokens: 512 # max answer length
 temperature: 0.2 # randomness - model is now more deterministic
 top_p: 0.9 # range of tokens considered during sampling
 max_context_tokens: 5000 # tokens
+cache_dir: "db/gemma_model" 

@@ -36,6 +36,12 @@ class Settings(BaseSettings):
         return self.project_root / "db"
 
     @property
+    def llm_dir(self) -> Path:
+        llm_path = self.db_dir / "gemma_model"
+        llm_path.mkdir(parents=True, exist_ok=True)
+        return llm_path
+
+    @property
     def doc_upload_dir(self) -> Path:
         docs_path = self.db_dir / "chunks"
         docs_path.mkdir(parents=True, exist_ok=True)
