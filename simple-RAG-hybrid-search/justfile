@@ -1,0 +1,4 @@
+# Run the development server
+
+dev:
+    uv run uvicorn app:app --reload

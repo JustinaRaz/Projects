@@ -1,0 +1,55 @@
+version: 1
+
+disable_existing_loggers: false
+
+formatters:
+  standard:
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+  llm:
+    format: "%(asctime)s | %(name)s\n%(message)s\n%(separator)s" # new line formatting
+    datefmt: "%Y-%m-%d %H:%M:%S"
+
+# where the logged message goes:
+handlers:
+  console: # shows in terminal
+    class: logging.StreamHandler
+    level: INFO
+    formatter: standard
+    stream: ext://sys.stdout
+
+  file: # saves into a file
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: standard
+    filename: db/logs/app.log
+    encoding: utf-8
+
+  llm_file:                       
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: standard
+    filename: db/logs/llm_inputs.log 
+    maxBytes: 10485760 # 10 MB, then rotate
+    backupCount: 5
+    encoding: utf-8
+
+loggers:
+  app:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  src:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+  src.llm:                        
+    level: DEBUG
+    handlers: [llm_file] # file only, keeps the console clean
+    propagate: false 
+
+root:
+  level: WARNING
+  handlers:
+    - console
