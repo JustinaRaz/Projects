@@ -7,8 +7,10 @@ from routers.schemas.document import DocumentUploadedResponse
 from src.core.api import get_weaviate
 from src.core.weaviate_client import WeaviateClient
 from src.processing.preprocessor import extract_document
+from src.rag.llm import Gemma
 
 logger = logging.getLogger("app")
+
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -76,10 +78,30 @@ async def upload_document(
     description="Hybrid search using Weaviate's BM25 and all-MiniLM-L6-v2 dense vectors"
 )
 
-def perform_hybrid_search(collection_name: str,
-                          question: str,
-                          client: WeaviateClient = Depends(get_weaviate)):  # noqa: B008
+def perform_hybrid_search(question: str,
+                          client: WeaviateClient = Depends(get_weaviate), # noqa: B008
+                          collection_name: str = "Testing"):
 
     response = client.hybrid_search(collection_name = collection_name,
                                     query = question)
+    return response
+
+
+@router.get(
+    "/llm_retrieval",
+    summary="Perform hybrid search + LLM request",
+    description="Performs the search of information, sends retrieved chunks to LLM.")
+
+def get_answer(question: str,
+               client: WeaviateClient = Depends(get_weaviate), # noqa: B008
+               collection_name: str = "Testing",
+    ):
+
+    chunks = perform_hybrid_search(question=question,
+                                   client = client,
+                                   collection_name = collection_name)
+    gemma = Gemma()
+    response = gemma.generate(question=question,
+                              context=chunks)
+
     return response

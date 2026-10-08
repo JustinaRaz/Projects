@@ -39,7 +39,8 @@ class Chunker:
         )
 
     def _sentence_split(self, text: str) -> list[str]:
-        """Split text into sentences using PySBD."""
+        """Split text into sentences using PySBD - sentence boundary detection.
+        """
 
         sentences = self.segmenter.segment(text)
 

@@ -14,7 +14,6 @@ class Embedder:
     def __init__(self, model_name: str | None = None):
         self.model_name = model_name or settings.embedding_model_name
         logger.info("Loading embedding model '%s'", self.model_name)
-        
         self._model = SentenceTransformer(self.model_name)
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
@@ -28,8 +27,10 @@ class Embedder:
         """
         if not texts:
             return []
-        
-        embeddings = self._model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
+
+        embeddings = self._model.encode(texts,
+                                        convert_to_numpy=True,
+                                        show_progress_bar=False)
         return embeddings.tolist()
 
     def embed_query(self, query: str) -> list[float]:

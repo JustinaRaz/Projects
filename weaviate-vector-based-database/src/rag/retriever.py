@@ -5,7 +5,7 @@ import logging
 from src.core.weaviate_client import WeaviateClient
 from src.rag.embedder import get_embedder
 
-logger = logging.getLogger("app")
+logger = logging.getLogger("src")
 
 
 def retrieve(

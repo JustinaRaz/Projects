@@ -52,6 +52,14 @@ class Settings(BaseSettings):
         return self.config_dir / "logger.yaml"
 
     @property
+    def llm_config_path(self) -> Path:
+        return self.config_dir / "llm.yaml"
+
+    @property
+    def system_prompt_path(self) -> Path:
+        return self.config_dir / "prompts.yaml"
+
+    @property
     def log_dir(self) -> Path:
         log_path = self.db_dir / "logs"
         log_path.mkdir(parents=True, exist_ok=True)

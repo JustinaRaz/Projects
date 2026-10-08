@@ -15,6 +15,6 @@ def get_weaviate(request: Request) -> WeaviateClient:
     Returns:
         The application's shared WeaviateClient instance.
     """
-    
+
     client = request.app.state.client
     return client
