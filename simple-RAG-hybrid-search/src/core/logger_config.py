@@ -1,4 +1,6 @@
+import logging
 import logging.config
+import warnings
 
 import yaml
 
@@ -13,3 +15,5 @@ def setup_logging() -> None:
         config = yaml.safe_load(file)
 
     logging.config.dictConfig(config)
+    logging.captureWarnings(True)
+    warnings.simplefilter("default", DeprecationWarning)

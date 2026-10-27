@@ -23,35 +23,20 @@ class Settings(BaseSettings):
 
     project_root: Path = PROJECT_ROOT
 
+    # External services
+    weaviate_url: str = Field(validation_alias="WEAVIATE_URL")
+    weaviate_api_key: str = Field(validation_alias="WEAVIATE_API_KEY")
+
+    # Embeddings and chunking
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    max_tokens_per_chunk: int = 200 # slightly lower than embedding model maximum
+    overlap_tokens: int = 40
+    sentence_language: str = "en"
+
+    # Configuration files
     @property
     def config_dir(self) -> Path:
         return self.project_root / "config"
-
-    @property
-    def src_dir(self) -> Path:
-        return self.project_root / "src"
-
-    @property
-    def db_dir(self) -> Path:
-        return self.project_root / "db"
-
-    @property
-    def llm_dir(self) -> Path:
-        llm_path = self.db_dir / "gemma_model"
-        llm_path.mkdir(parents=True, exist_ok=True)
-        return llm_path
-
-    @property
-    def doc_upload_dir(self) -> Path:
-        docs_path = self.db_dir / "chunks"
-        docs_path.mkdir(parents=True, exist_ok=True)
-        return docs_path
-
-    @property
-    def text_upload_dir(self) -> Path:
-        text_path = self.db_dir / "text"
-        text_path.mkdir(parents=True, exist_ok=True)
-        return text_path
 
     @property
     def logging_config_path(self) -> Path:
@@ -65,10 +50,43 @@ class Settings(BaseSettings):
     def system_prompt_path(self) -> Path:
         return self.config_dir / "prompts.yaml"
 
+    # Directories
+    @property
+    def src_dir(self) -> Path:
+        return self.project_root / "src"
+
+    @property
+    def db_dir(self) -> Path:
+        return self.project_root / "db"
+
+    @property
+    def llm_dir(self) -> Path:
+        llm_path = self.project_root/ "gemma_model"
+        return llm_path
+
+    @property
+    def doc_upload_dir(self) -> Path:
+        docs_path = self.db_dir / "chunks"
+        return docs_path
+
+    @property
+    def rag_records_dir(self) -> Path:
+        docs_path = self.db_dir / "rag_records"
+        return docs_path
+
+    @property
+    def text_upload_dir(self) -> Path:
+        text_path = self.db_dir / "text"
+        return text_path
+
+    @property
+    def rag_record_upload_dir(self) -> Path:
+        rag_record_upload_path = self.db_dir / "rag_records"
+        return rag_record_upload_path
+
     @property
     def log_dir(self) -> Path:
         log_path = self.db_dir / "logs"
-        log_path.mkdir(parents=True, exist_ok=True)
         return log_path
 
     def init_dirs(self) -> None:
@@ -84,14 +102,6 @@ class Settings(BaseSettings):
 
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
-
-    weaviate_url: str = Field(validation_alias="WEAVIATE_URL")
-    weaviate_api_key: str = Field(validation_alias="WEAVIATE_API_KEY")
-
-    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
-    MAX_TOKENS_PER_CHUNK: int = 200 # embedding model maximum
-    OVERLAP_TOKENS: int = 40
-    sentence_language: str = "en"
 
 
 @lru_cache

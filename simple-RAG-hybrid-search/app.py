@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -13,11 +14,28 @@ settings.init_dirs()
 setup_logging()
 logger = logging.getLogger("app")
 
-app = FastAPI(title="Practice Project", description="Created for practicing reasons.")
-logger.info("Application starting")
 
-weaviate_client = WeaviateClient()
-app.state.client = weaviate_client
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage the Weaviate client lifecycle."""
+    logger.info("Application starting")
+
+    client = WeaviateClient()
+    app.state.client = client
+
+    try:
+        yield
+    finally:
+        logger.info("Closing Weaviate client")
+        client.close()
+        logger.info("Weaviate client closed")
+
+
+app = FastAPI(
+    title="Practice Project",
+    description="Created for practicing reasons.",
+    lifespan=lifespan,
+)
 
 app.include_router(collection.router)
 app.include_router(document.router)

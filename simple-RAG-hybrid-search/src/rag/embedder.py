@@ -13,7 +13,8 @@ class Embedder:
 
     def __init__(self, model_name: str | None = None):
         self.model_name = model_name or settings.embedding_model_name
-        logger.info("Loading embedding model '%s'", self.model_name)
+
+        logger.info(f"Loading embedding model {self.model_name}")
         self._model = SentenceTransformer(self.model_name)
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:

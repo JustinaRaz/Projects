@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -52,9 +53,10 @@ async def upload_document(
 
     try:
         logger.info(f"The upload of {file.filename} is starting.")
+        filename = Path(file.filename).stem
         result = client.index_document(
             contents=contents,
-            filename=file.filename,
+            filename=filename,
             collection_name=collection_name,
         )
         logger.info("Document %s was uploaded successfully.", file.filename)
@@ -102,6 +104,6 @@ def get_answer(question: str,
                                    collection_name = collection_name)
     gemma = Gemma()
     response = gemma.generate(question=question,
-                              context=chunks)
+                              chunks=chunks)
 
     return response

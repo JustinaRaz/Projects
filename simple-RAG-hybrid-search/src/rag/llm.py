@@ -1,78 +1,92 @@
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 
 import torch
 import yaml
-from transformers import AutoProcessor, AutoTokenizer, Gemma3ForConditionalGeneration
+from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 
-from src.core.settings import Settings, get_settings
+from src.core.settings import get_settings
+from src.llm.llm_config import load_llm_config
 from src.rag.context_formatting import ContextBuilder
 
-logger = logging.getLogger("src")
 llm_logger = logging.getLogger("src.llm")
 
 def load_config(path: Path) -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
 
+_write_lock = Lock()
+
+def save_rag_record(path: Path,
+                    question: str,
+                    contexts: list[str],
+                    answer: str) -> None:
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_input": question,
+        "retrieved_contexts": contexts,
+        "response": answer,
+    }
+    with _write_lock, path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
 class Gemma:
     """Gemma: stores relevant llm functions.
     """
-    def __init__(self, settings: Settings | None = None):
+    def __init__(self):
 
-        settings = settings or get_settings()
-        prompts = load_config(settings.system_prompt_path)
+        self.settings = get_settings()
+        prompts = load_config(self.settings.system_prompt_path)
         self.system_prompt = prompts["system"]
         self.user_template = prompts["user"]
-        self.llm_config = load_config(settings.llm_config_path)
+
+        self.config = load_llm_config()
+
         self.model = None
         self.processor = None
-        self.model_id = self.llm_config["model_name"]
-        self.tokenizer = None
         self.context_builder = None
-        self.cache_dir = settings.llm_dir
 
     def _load(self):
 
-        if self.processor is not None and self.model is not None:
+        if self.model is not None and self.processor is not None and self.context_builder is not None:
             return
 
-        logger.info("Loading the model and its processor.")
+        llm_logger.info("Loading the model's processor.")
 
+        model_settings = self.config.model
         if self.processor is None:
-            self.processor = AutoProcessor.from_pretrained(self.model_id,
-                                                           cache_dir = self.cache_dir )
+            self.processor = AutoProcessor.from_pretrained(
+                model_settings.model_id,
+                cache_dir = model_settings.cache_dir,
+                use_fast=False)
+
+        llm_logger.info(f"Loading {model_settings.model_id}.")
 
         if self.model is None:
-            dtype = self.llm_config["torch_dtype"]
+            dtype = model_settings.torch_dtype
             if dtype != "auto":
                 dtype = getattr(torch, dtype)
 
             self.model = Gemma3ForConditionalGeneration.from_pretrained(
-                self.model_id,
+                model_settings.model_id,
                 dtype=dtype,
-                device_map=self.llm_config["device"],
-                cache_dir=self.cache_dir
+                device_map=model_settings.device_map,
+                cache_dir=model_settings.cache_dir
             ).eval()
 
-        if self.tokenizer is None:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        llm_logger.info("Loading the LLM's context builder.")
 
-        self.context_builder = ContextBuilder(
-                                tokenizer=self.tokenizer,
-                                max_context_tokens=self.llm_config["max_context_tokens"]
-                            )
-
-    def _format_params(self) -> dict:
-        """Sampling kwargs for generate(); empty dict -> greedy decoding."""
-        kwargs = {}
-        if "temperature" in self.llm_config:
-            kwargs["temperature"] = self.llm_config["temperature"]
-        if "top_p" in self.llm_config:
-            kwargs["top_p"] = self.llm_config["top_p"]
-        return kwargs
-
+        if self.context_builder is None:
+            llm_logger.info("Creating the context builder.")
+            self.context_builder = ContextBuilder(
+                tokenizer=self.processor.tokenizer,
+                render_prompt=self._render_prompt,
+                max_context_tokens=self.config.context.max_context_tokens,
+                max_new_tokens=self.config.generation.max_new_tokens,
+            )
 
     def _build_user_prompt(self, question: str, context: str) -> str:
         """Fills in the placeholders of the user prompt.
@@ -85,7 +99,7 @@ class Gemma:
             str: User prompt
         """
 
-        logger.info("Building user's prompt.")
+        llm_logger.info("Building user's prompt.")
 
         return (
             self.user_template
@@ -103,7 +117,7 @@ class Gemma:
             list[dict]: Formatted chat entry
         """
 
-        logger.info("Constructing a chat for Gemma model.")
+        llm_logger.info("Constructing a chat structure for Gemma model.")
 
         chat = [
             {"role": "system", "content": [{"type": "text",
@@ -112,19 +126,22 @@ class Gemma:
                                           "text": user_prompt}]},
         ]
 
-        llm_logger.debug(f"Constructed chat: {chat}")
-
         return chat
 
-    def generate(self, question: str, context: dict) -> str:
+    def _render_prompt(self, question: str, context: str) -> str:
+        """Prompt text exactly as the model sees it (chat template applied)."""
+        chat = self._format_chat(self._build_user_prompt(question, context))
+
+        return self.processor.apply_chat_template(
+            chat, tokenize=False, add_generation_prompt=True
+        )
+
+    def generate(self, question: str, chunks: dict) -> str:
+
+        # Loads the LLM
         self._load()
 
-        context = self.context_builder.build_context(context)
-
-        kwargs = self._format_params()
-        do_sample = len(kwargs) > 0
-        if not do_sample:
-            logger.info("No sampling params given, setting do_sample=False")
+        context, context_chunks = self.context_builder.build_context(question, chunks)
 
         chat = self._format_chat(self._build_user_prompt(question, context))
 
@@ -142,22 +159,31 @@ class Gemma:
 
         input_len = model_inputs["input_ids"].shape[-1]
 
+        # Loads parameters for LLM generation
+        llm_logger.info("Loading parameters for setting LLM generation.")
+
+        gen_settings = self.config.generation
+        params = {
+            "max_new_tokens": gen_settings.max_new_tokens,
+            "do_sample": gen_settings.do_sample,
+        }
+
+        if gen_settings.do_sample:
+            params["temperature"] = gen_settings.temperature
+            params["top_p"] = gen_settings.top_p
+
         with torch.inference_mode():
             output = self.model.generate(
                 **model_inputs,
-                max_new_tokens=self.llm_config["max_new_tokens"],
-                do_sample=do_sample,
-                **kwargs,
+                **params,
             )
 
         raw = self.processor.decode(output[0][input_len:], skip_special_tokens=True)
-        try:
-            response = json.loads(raw)
-            answer = response["answer"]
-            llm_logger.debug("LLM EXTRACTED OUTPUT:\n%s", raw)
-        except (json.JSONDecodeError, KeyError):
-            logger.warning("Model returned invalid JSON, using raw text")
-            answer = raw
-            llm_logger.debug("LLM RAW OUTPUT:\n%s", answer)
 
-        return answer
+        save_rag_record(path = self.settings.rag_record_upload_dir,
+                        question = question,
+                        contexts = context_chunks,
+                        answer = raw)
+        llm_logger.info(f"RAG record saved at {self.settings.rag_record_upload_dir}")
+
+        return raw

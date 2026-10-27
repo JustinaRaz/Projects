@@ -27,16 +27,16 @@ def extract_document(contents: bytes, filename: str) -> DoclingDocument:
         DocumentParsingError: If docling cannot parse the file (corrupt
             file, unsupported format, etc.).
     """
-    source = DocumentStream(name=filename, stream=BytesIO(contents))
+    source = DocumentStream(name=filename, stream=BytesIO(contents)) # Packages file
 
     try:
         result = _converter.convert(source)
     except Exception as exc:
-        logger.exception("Docling failed to parse '%s'", filename)
         error_message = f"Failed to parse document '{filename}'"
+        logger.exception(error_message)
         raise RuntimeError(error_message) from exc
 
-    document = result.document
+    document = result.document # From raw file to DoclingDocument
 
     markdown = document.export_to_markdown()
     output_path = settings.text_upload_dir / f"{Path(filename).stem}.md"

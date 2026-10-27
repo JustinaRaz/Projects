@@ -1,8 +1,12 @@
-model_name: "google/gemma-3-4b-it"
-device: "auto" # where it runs - could be gpu
-torch_dtype: "auto" # numerical precision/memory - could be float32/float16/bfloat16
-max_new_tokens: 512 # max answer length
-temperature: 0.2 # randomness - model is now more deterministic
-top_p: 0.9 # range of tokens considered during sampling
-max_context_tokens: 5000 # tokens
-cache_dir: "db/gemma_model" 
+model:
+  model_id: "google/gemma-3-4b-it"
+  device_map: "cpu" # Where the model's computation is run. Could be "auto" if GPU is available. 
+  torch_dtype: "bfloat16" # Numerical precision used to store the model's weight [float32/float16/bfloat16].
+  cache_dir: "db/gemma_model" 
+generation:
+  max_new_tokens: 512 # Max answer length. Applies to the new generated tokens.
+  do_sample: True
+  temperature: 0.3 # Allows less variation in wording of the answer.
+  top_p: 0.9 # Controls token sampling. The model keeps the smallest set of highest-probability tokens, whose cumulative probability reaches at least 0.9.
+context:
+  max_context_tokens: 5000 # tokens

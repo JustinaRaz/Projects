@@ -20,8 +20,8 @@ class Chunker:
     def __init__(self):
         self.tokenizer = get_tokenizer()
 
-        self.max_tokens = settings.MAX_TOKENS_PER_CHUNK
-        self.overlap_tokens = settings.OVERLAP_TOKENS
+        self.max_tokens = settings.max_tokens_per_chunk
+        self.overlap_tokens = settings.overlap_tokens
 
         self.segmenter = pysbd.Segmenter(
             language=settings.sentence_language,
@@ -29,7 +29,13 @@ class Chunker:
         )
 
     def _count_tokens(self, text: str) -> int:
-        """Return the number of tokens in text."""
+        """Return the number of tokens in text.
+
+        Args:
+            text: A string of text.
+        Returns:
+            Number of tokens (int).
+        """
 
         return len(
             self.tokenizer.encode(
@@ -103,7 +109,6 @@ class Chunker:
 
         current_sentences: list[str] = []
         current_tokens = 0
-
         sentence_index = 0
 
         while sentence_index < len(sentences):
@@ -123,7 +128,7 @@ class Chunker:
                     current_tokens = 0
 
                 # Nothing can preserve the sentence boundary,
-                # so fall back to token-level splitting.
+                # fall back to token-level splitting.
                 windows.extend(
                     self._hard_split_by_tokens(sentence)
                 )
@@ -202,7 +207,7 @@ class Chunker:
 
         output_path = (
             settings.doc_upload_dir
-            / f"{filename}_chunks.json"
+            / f"{filename}.json"
         )
 
         with output_path.open(

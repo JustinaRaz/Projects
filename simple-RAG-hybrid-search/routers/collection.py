@@ -19,7 +19,7 @@ router = APIRouter(prefix="/collections", tags=["Collections"])
 @router.post("/{collection_name}",
              status_code = 201,
              response_model = CollectionCreatedResponse,
-             summary = "Create a collection",
+             summary = "Create a collection.",
              description = "Creates a new collection in the Weaviate database.")
 
 def create_collection(collection_name: str,
@@ -36,7 +36,7 @@ def create_collection(collection_name: str,
 
     try:
         client.create_collection(collection_name, description = payload.description)
-        logger.info("Collection '%s' created successfully.", collection_name)
+        logger.info(f"Collection {collection_name} created successfully.")
 
     except WeaviateBaseError as exc:
         error_message = f"Failed to create collection '{collection_name}'"
@@ -50,8 +50,8 @@ def create_collection(collection_name: str,
 
 @router.get("/inspect_collections",
             response_model=CollectionsListResponse,
-            summary = "List collections",
-            description = "List the overview of the available collections.")
+            summary = "List all collection names.",
+            description = "List the names of the available collections.")
 def get_collections(client: WeaviateClient = Depends(get_weaviate)): # noqa: B008
     try:
         collections = client.list_collections()
@@ -68,7 +68,7 @@ def get_collections(client: WeaviateClient = Depends(get_weaviate)): # noqa: B00
 
 @router.get("/inspect_collection",
             summary = "Inspect a collection",
-            description = "Inspect a specific collection.")
+            description = "Inspect a  collection by retrieving the chunks and vectors.")
 def inspect_collection(collection_name: str,
                        client: WeaviateClient = Depends(get_weaviate)): # noqa: B008
 
@@ -80,7 +80,7 @@ def inspect_collection(collection_name: str,
                response_model=CollectionDeletedResponse,
                summary = "Delete collection",
                description = "Removes the collection and its contents from cluster.")
-def delete_collections(collection_name: str,
+def delete_collection(collection_name: str,
                        client: WeaviateClient = Depends(get_weaviate) # noqa: B008
                        ) -> CollectionDeletedResponse:
 

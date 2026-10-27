@@ -48,8 +48,19 @@ loggers:
     level: DEBUG
     handlers: [llm_file] # file only, keeps the console clean
     propagate: false 
+  MatchingPostProcessor:
+    level: DEBUG
+    handlers: [file]
+    propagate: false
+  RapidOCR:
+    level: DEBUG
+    handlers: [file]
+    propagate: false
+  py.warnings: # catches deprecation warnings
+    level: WARNING
+    handlers: [console, file]
+    propagate: false
 
 root:
   level: WARNING
-  handlers:
-    - console
+  handlers: [console, file]
