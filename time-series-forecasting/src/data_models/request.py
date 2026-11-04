@@ -9,7 +9,22 @@ from pydantic import BaseModel, Field
 
 
 class EnergyDataRequest(BaseModel):
-    """Configuration for an Energi Data Service API request."""
+    """Configuration for an Energi Data Service API request.
+
+    By default, retrieves Danish day-ahead electricity prices for DK1.
+    The request can be customised by specifying a dataset, date range,
+    price area, and other API parameters.
+
+    Documentation:
+        https://www.energidataservice.dk/tso-electricity/DayAheadPrices
+    
+    DayAheadPrices dataset columns:
+        *TimeUTC*: Delivery interval timestamp in UTC.
+        *TimeDK*: Delivery interval timestamp in Danish local time.
+        *PriceArea*: Danish electricity bidding zone (DK1 or DK2).
+        *DayAheadPriceEUR*: Day-ahead price in EUR/MWh.
+        *DayAheadPriceDKK*: Day-ahead price in DKK/MWh.    
+    """
 
     base_url: str = "https://api.energidataservice.dk/dataset"
     dataset: str = "DayAheadPrices"
